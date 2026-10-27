@@ -69,7 +69,7 @@ services:
       OPENAI_API_KEY: dummy
       OPENAI_BASE_URL: http://litert-lm:8080/v1
       OPENAI_MODEL: ${LLM_MODEL_ID:-gemma-4-E2B-it.litertlm}
-      OPENAI_PROMPT: ${OPENAI_PROMPT:-この音声を日本語で文字起こししてください。音声に含まれている発話だけを返してください。説明や補足は不要です。}
+      OPENAI_PROMPT: ${OPENAI_PROMPT:-Transcribe this audio in English. Return only the words spoken in the audio, without any explanation or additional text.}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       OUTPUT_DIR: /data/recordings
       VAD_THRESHOLD: ${VAD_THRESHOLD:-0.3}

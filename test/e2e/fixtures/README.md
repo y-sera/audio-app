@@ -2,7 +2,7 @@
 
 | File | Content |
 | --- | --- |
-| `sample.wav` | Short Japanese utterance. 16 kHz, mono, 16-bit PCM, like the audio-app records. |
+| `sample.wav` | Short English utterance. 16 kHz, mono, 16-bit PCM, like the audio-app records. |
 | `expected-keywords.txt` | One keyword per line (`#` starts a comment). The test passes when the transcription contains **all** of them. |
 
 Matching ignores whitespace, letter case and full-width/half-width differences (NFKC).

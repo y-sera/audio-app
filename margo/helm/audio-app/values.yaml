@@ -26,7 +26,7 @@ app:
   logLevel: INFO
 
   # Prompt sent with each utterance. Empty uses the app's built-in
-  # Japanese transcription prompt.
+  # English transcription prompt.
   transcriptionPrompt: ""
 
   # LiteRT-LM server API settings. When llm.enabled is true, baseUrl is

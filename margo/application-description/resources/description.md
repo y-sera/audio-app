@@ -37,7 +37,7 @@ into text, entirely on the device.
 | Parameter | Default | Description |
 | --- | --- | --- |
 | Log Level | `INFO` | Log level of the audio-app |
-| Transcription Prompt | Japanese transcription instruction | Instruction sent with each utterance |
+| Transcription Prompt | English transcription instruction | Instruction sent with each utterance |
 | Start Threshold | `0.3` | VAD speech probability that starts a recording |
 | End Threshold | `0.2` | VAD speech probability below which a recording may end |
 | Minimum Speech (ms) | `150` | Speech needed before a recording starts |

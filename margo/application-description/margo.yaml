@@ -99,7 +99,7 @@ parameters:
       - pointer: LOG_LEVEL
         components: ["audio-app-compose"]
   transcriptionPrompt:
-    value: この音声を日本語で文字起こししてください。音声に含まれている発話だけを返してください。説明や補足は不要です。
+    value: Transcribe this audio in English. Return only the words spoken in the audio, without any explanation or additional text.
     targets:
       - pointer: app.transcriptionPrompt
         components: ["audio-app"]

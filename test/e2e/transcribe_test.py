@@ -21,11 +21,9 @@ from pathlib import Path
 
 # Keep in sync with OPENAI_PROMPT in app/audio-app/src/app/transcription.py.
 DEFAULT_PROMPT = (
-    "この音声を日本語で"
-    "文字起こししてください。"
-    "音声に含まれている発話だけを"
-    "返してください。"
-    "説明や補足は不要です。"
+    "Transcribe this audio in English. "
+    "Return only the words spoken in the audio, "
+    "without any explanation or additional text."
 )
 
 
