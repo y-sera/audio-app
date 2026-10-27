@@ -48,10 +48,10 @@ spec:
         resources:
           requests:
             cpu: "2"
-            memory: 3000Mi
+            memory: 2000Mi
           limits:
             cpu: "4"
-            memory: 6000Mi
+            memory: 3000Mi
         volumeMounts:
         - name: cache-volume
           mountPath: /root/.litert-lm/models/

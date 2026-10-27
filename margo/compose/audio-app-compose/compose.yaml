@@ -57,7 +57,7 @@ services:
       resources:
         limits:
           cpus: "4"
-          memory: 6000M
+          memory: 3000M
 
   audio-app:
     image: ghcr.io/y-sera/audio-app/audio-app:0.1.1
