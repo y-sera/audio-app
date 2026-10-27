@@ -1,0 +1,230 @@
+apiVersion: v1
+id: y-sera-audio-app
+metadata:
+  name: Audio Transcription App
+  description: >-
+    Captures audio from a USB microphone, detects utterances with Silero VAD
+    and transcribes each one with a locally hosted Gemma model served by LiteRT-LM.
+  # MUST equal the tag of the Application Package in the Application Registry.
+  version: 0.1.0
+  catalog:
+    application:
+      icon: ./resources/icon.png
+      tagline: On-device speech transcription with VAD and a local LLM.
+      descriptionFile: ./resources/description.md
+      releaseNotes: ./resources/release-notes.md
+      licenseFile: ./resources/license.md
+      site: https://github.com/y-sera/audio-app
+      tags: ["audio", "transcription", "speech", "llm", "edge-ai"]
+    author:
+      - name: Yasuaki Sera
+    organization:
+      - name: y-sera
+        site: https://github.com/y-sera
+deploymentProfiles:
+  - type: helm
+    id: y-sera-audio-app-helm-a
+    description: >-
+      Deploys the audio-app and a LiteRT-LM server as a single Helm chart on Kubernetes.
+      The device needs a USB microphone and an NVIDIA GPU (Vulkan) usable through the
+      "nvidia" RuntimeClass. By default the microphone is requested as the extended
+      resource "devic.es/audio", which must be advertised by a device plugin
+      (e.g. squat/generic-device-plugin) installed on the node.
+    components:
+      - name: audio-app
+        properties:
+          repository: oci://ghcr.io/y-sera/audio-app/charts/audio-app
+          revision: 0.1.0
+          wait: true
+          # Includes the first-start download of the model (~2.5 GB).
+          timeout: 20m0s
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 2.5
+          architectures:
+            - amd64
+        memory: 4096Mi
+        storage: 10Gi
+      eligibilityRules:
+        - propertySelector:
+            matchExpressions:
+              - key: /peripherals
+                operator: ContainsAll
+                itemSelector:
+                  matchExpressions:
+                    - key: /type
+                      operator: In
+                      values: ["microphone"]
+              - key: /peripherals
+                operator: ContainsAll
+                itemSelector:
+                  matchExpressions:
+                    - key: /type
+                      operator: In
+                      values: ["gpu"]
+                    - key: /manufacturer
+                      operator: In
+                      values: ["NVIDIA"]
+  - type: compose
+    id: y-sera-audio-app-compose-a
+    description: >-
+      Deploys the audio-app and a LiteRT-LM server with Compose. The device needs a
+      USB microphone exposed as /dev/snd and an NVIDIA GPU usable through the
+      NVIDIA Container Toolkit.
+    components:
+      - name: audio-app-compose
+        properties:
+          repository: oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose
+          revision: 0.1.0
+          wait: true
+          timeout: 20m0s
+    deviceConstraints:
+      capacityRequirements:
+        cpu:
+          cores: 2.5
+          architectures:
+            - amd64
+        memory: 4096Mi
+        storage: 10Gi
+      eligibilityRules:
+        - propertySelector:
+            matchExpressions:
+              - key: /peripherals
+                operator: ContainsAll
+                itemSelector:
+                  matchExpressions:
+                    - key: /type
+                      operator: In
+                      values: ["microphone"]
+              - key: /peripherals
+                operator: ContainsAll
+                itemSelector:
+                  matchExpressions:
+                    - key: /type
+                      operator: In
+                      values: ["gpu"]
+                    - key: /manufacturer
+                      operator: In
+                      values: ["NVIDIA"]
+parameters:
+  logLevel:
+    value: INFO
+    targets:
+      - pointer: app.logLevel
+        components: ["audio-app"]
+      - pointer: LOG_LEVEL
+        components: ["audio-app-compose"]
+  transcriptionPrompt:
+    value: この音声を日本語で文字起こししてください。音声に含まれている発話だけを返してください。説明や補足は不要です。
+    targets:
+      - pointer: app.transcriptionPrompt
+        components: ["audio-app"]
+      - pointer: OPENAI_PROMPT
+        components: ["audio-app-compose"]
+  vadThreshold:
+    value: 0.3
+    targets:
+      - pointer: app.vad.threshold
+        components: ["audio-app"]
+      - pointer: VAD_THRESHOLD
+        components: ["audio-app-compose"]
+  vadThresholdEnd:
+    value: 0.2
+    targets:
+      - pointer: app.vad.thresholdEnd
+        components: ["audio-app"]
+      - pointer: VAD_THRESHOLD_END
+        components: ["audio-app-compose"]
+  minSpeechMs:
+    value: 150
+    targets:
+      - pointer: app.vad.minSpeechMs
+        components: ["audio-app"]
+      - pointer: MIN_SPEECH_MS
+        components: ["audio-app-compose"]
+  minSilenceMs:
+    value: 700
+    targets:
+      - pointer: app.vad.minSilenceMs
+        components: ["audio-app"]
+      - pointer: MIN_SILENCE_MS
+        components: ["audio-app-compose"]
+  llmBackend:
+    value: gpu
+    targets:
+      - pointer: llm.model.backend
+        components: ["audio-app"]
+      - pointer: LLM_BACKEND
+        components: ["audio-app-compose"]
+  audioDeviceResourceName:
+    value: devic.es/audio
+    targets:
+      - pointer: app.audioDevice.resourceName
+        components: ["audio-app"]
+configuration:
+  sections:
+    - name: General
+      settings:
+        - parameter: logLevel
+          name: Log Level
+          description: Log level of the audio-app.
+          schema: logLevelSelect
+        - parameter: transcriptionPrompt
+          name: Transcription Prompt
+          description: Instruction sent to the LLM together with each recorded utterance.
+          schema: requiredText
+    - name: Voice Activity Detection
+      settings:
+        - parameter: vadThreshold
+          name: Start Threshold
+          description: Speech probability (0-1) above which a recording starts.
+          schema: probability
+        - parameter: vadThresholdEnd
+          name: End Threshold
+          description: Speech probability (0-1) below which an active recording is allowed to end.
+          schema: probability
+        - parameter: minSpeechMs
+          name: Minimum Speech (ms)
+          description: Minimum speech duration in milliseconds before a recording is started.
+          schema: milliseconds
+        - parameter: minSilenceMs
+          name: Minimum Silence (ms)
+          description: Silence duration in milliseconds that ends a recording.
+          schema: milliseconds
+    - name: LLM
+      settings:
+        - parameter: llmBackend
+          name: Inference Backend
+          description: Backend LiteRT-LM uses to run the model.
+          schema: llmBackendSelect
+    - name: Kubernetes
+      settings:
+        - parameter: audioDeviceResourceName
+          name: Microphone Resource Name
+          description: Extended resource name a device plugin advertises for /dev/snd (Helm deployments only).
+          schema: requiredText
+  schema:
+    - name: requiredText
+      dataType: string
+      allowEmpty: false
+      maxLength: 500
+    - name: probability
+      dataType: double
+      minValue: 0.0
+      maxValue: 1.0
+      maxPrecision: 3
+      allowEmpty: false
+    - name: milliseconds
+      dataType: integer
+      minValue: 0
+      maxValue: 10000
+      allowEmpty: false
+    - name: logLevelSelect
+      dataType: string
+      options: ["DEBUG", "INFO", "WARNING", "ERROR"]
+      allowEmpty: false
+    - name: llmBackendSelect
+      dataType: string
+      options: ["gpu", "cpu"]
+      allowEmpty: false

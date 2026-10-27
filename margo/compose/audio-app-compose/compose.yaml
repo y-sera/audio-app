@@ -1,0 +1,104 @@
+# Margo Compose component for audio-app.
+#
+# Packaged as a Margo Compose Archive: this file MUST be named compose.yaml
+# and sit in the single top-level directory of the archive.
+#
+# Parameters from the application description are passed as environment
+# variables (Target.pointer) and picked up via interpolation below.
+
+name: audio-app
+
+services:
+  litert-lm:
+    image: ghcr.io/y-sera/audio-app/litert-lm:0.1.0
+    restart: unless-stopped
+    environment:
+      LLM_MODEL_ID: ${LLM_MODEL_ID:-gemma-4-E2B-it.litertlm}
+      LLM_MODEL_HF_REPO: ${LLM_MODEL_HF_REPO:-litert-community/gemma-4-E2B-it-litert-lm}
+      LLM_MODEL_HF_FILE: ${LLM_MODEL_HF_FILE:-gemma-4-E2B-it.litertlm}
+      LLM_BACKEND: ${LLM_BACKEND:-gpu}
+      LLM_AUDIO_BACKEND: ${LLM_AUDIO_BACKEND:-cpu}
+    # Download the model on first start, write config.json, then serve.
+    command:
+      - sh
+      - -ec
+      - |
+        model_dir="/root/.litert-lm/models/$$(echo "$$LLM_MODEL_ID" | sed 's#/#--#g')"
+        if [ ! -f "$$model_dir/model.litertlm" ]; then
+          litert-lm import --from-huggingface-repo="$$LLM_MODEL_HF_REPO" "$$LLM_MODEL_HF_FILE" "$$LLM_MODEL_ID"
+        fi
+        mkdir -p /etc/litert-lm
+        cat > /etc/litert-lm/config.json <<EOF
+        {
+          "default": {},
+          "models": {
+            "$$LLM_MODEL_ID": {
+              "backend": "$$LLM_BACKEND",
+              "audio_backend": "$$LLM_AUDIO_BACKEND"
+            }
+          }
+        }
+        EOF
+        exec litert-lm serve --host=0.0.0.0 --port=8080 --config=/etc/litert-lm/config.json --verbose
+    volumes:
+      - litert-lm-models:/root/.litert-lm/models
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/models', timeout=5)
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      # Allows for the first-start model download.
+      start_period: 10m
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 6000M
+        # GPU backend (Vulkan) on NVIDIA. Requires the NVIDIA Container Toolkit.
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, graphics, compute, utility]
+
+  audio-app:
+    image: ghcr.io/y-sera/audio-app/audio-app:0.1.0
+    restart: unless-stopped
+    depends_on:
+      litert-lm:
+        condition: service_healthy
+    environment:
+      OPENAI_API_KEY: dummy
+      OPENAI_BASE_URL: http://litert-lm:8080/v1
+      OPENAI_MODEL: ${LLM_MODEL_ID:-gemma-4-E2B-it.litertlm}
+      OPENAI_API_AUDIO_INPUT_TYPE: audio
+      OPENAI_PROMPT: ${OPENAI_PROMPT:-この音声を日本語で文字起こししてください。音声に含まれている発話だけを返してください。説明や補足は不要です。}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      OUTPUT_DIR: /data/recordings
+      VAD_THRESHOLD: ${VAD_THRESHOLD:-0.3}
+      VAD_THRESHOLD_END: ${VAD_THRESHOLD_END:-0.2}
+      VAD_GAIN: ${VAD_GAIN:-1.0}
+      VAD_AUTO_NORM: ${VAD_AUTO_NORM:-1}
+      VAD_TARGET_PEAK: ${VAD_TARGET_PEAK:-0.6}
+      VAD_MAX_NORM_GAIN: ${VAD_MAX_NORM_GAIN:-16.0}
+      VAD_CLIP_LIMIT: ${VAD_CLIP_LIMIT:-0.02}
+      MIN_SPEECH_MS: ${MIN_SPEECH_MS:-150}
+      MIN_SILENCE_MS: ${MIN_SILENCE_MS:-700}
+    # ALSA capture device (USB microphone) from the host.
+    devices:
+      - /dev/snd:/dev/snd
+    volumes:
+      - recordings:/data/recordings
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+volumes:
+  litert-lm-models:
+  recordings:

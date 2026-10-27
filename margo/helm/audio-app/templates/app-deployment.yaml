@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "audio-app.fullname" . }}
+  labels:
+    {{- include "audio-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  replicas: 1
+  # The microphone can only be opened by one process at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "audio-app.appSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "audio-app.appSelectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: main
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          env:
+            - name: OPENAI_API_KEY
+              value: {{ .Values.app.openai.apiKey | quote }}
+            - name: OPENAI_BASE_URL
+              value: {{ include "audio-app.openaiBaseUrl" . | quote }}
+            - name: OPENAI_MODEL
+              value: {{ include "audio-app.openaiModel" . | quote }}
+            - name: OPENAI_API_AUDIO_INPUT_TYPE
+              value: {{ .Values.app.openai.audioInputType | quote }}
+            {{- with .Values.app.transcriptionPrompt }}
+            - name: OPENAI_PROMPT
+              value: {{ . | quote }}
+            {{- end }}
+            - name: LOG_LEVEL
+              value: {{ .Values.app.logLevel | quote }}
+            - name: OUTPUT_DIR
+              value: {{ .Values.app.recordings.path | quote }}
+            - name: VAD_THRESHOLD
+              value: {{ .Values.app.vad.threshold | quote }}
+            - name: VAD_THRESHOLD_END
+              value: {{ .Values.app.vad.thresholdEnd | quote }}
+            - name: VAD_GAIN
+              value: {{ .Values.app.vad.gain | quote }}
+            - name: VAD_AUTO_NORM
+              value: {{ ternary "1" "0" (eq (toString .Values.app.vad.autoNorm) "true") | quote }}
+            - name: VAD_TARGET_PEAK
+              value: {{ .Values.app.vad.targetPeak | quote }}
+            - name: VAD_MAX_NORM_GAIN
+              value: {{ .Values.app.vad.maxNormGain | quote }}
+            - name: VAD_CLIP_LIMIT
+              value: {{ .Values.app.vad.clipLimit | quote }}
+            - name: MIN_SPEECH_MS
+              value: {{ .Values.app.vad.minSpeechMs | quote }}
+            - name: MIN_SILENCE_MS
+              value: {{ .Values.app.vad.minSilenceMs | quote }}
+          {{- if eq .Values.app.audioDevice.mode "hostPath" }}
+          securityContext:
+            privileged: true
+          {{- else if ne .Values.app.audioDevice.mode "devicePlugin" }}
+          {{- fail "app.audioDevice.mode must be devicePlugin or hostPath" }}
+          {{- end }}
+          resources:
+            requests:
+              {{- toYaml .Values.app.resources.requests | nindent 14 }}
+              {{- if eq .Values.app.audioDevice.mode "devicePlugin" }}
+              {{ .Values.app.audioDevice.resourceName }}: 1
+              {{- end }}
+            limits:
+              {{- toYaml .Values.app.resources.limits | nindent 14 }}
+              {{- if eq .Values.app.audioDevice.mode "devicePlugin" }}
+              {{ .Values.app.audioDevice.resourceName }}: 1
+              {{- end }}
+          volumeMounts:
+            - name: recordings
+              mountPath: {{ .Values.app.recordings.path }}
+            {{- if eq .Values.app.audioDevice.mode "hostPath" }}
+            - name: snd
+              mountPath: /dev/snd
+            {{- end }}
+      volumes:
+        - name: recordings
+          {{- if .Values.app.recordings.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "audio-app.fullname" . }}-recordings
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if eq .Values.app.audioDevice.mode "hostPath" }}
+        - name: snd
+          hostPath:
+            path: {{ .Values.app.audioDevice.hostPath }}
+        {{- end }}
+      {{- with .Values.app.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

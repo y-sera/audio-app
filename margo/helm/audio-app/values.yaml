@@ -1,0 +1,130 @@
+# Default values for the audio-app chart.
+#
+# Margo note: the namespace is chosen by the Workload Fleet Manager, so no
+# template sets metadata.namespace. Templates also avoid `lookup`, hooks and
+# CRDs (see the Helm exceptions in the Margo application description spec).
+
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+# ------------------------------------------------------------
+# audio-app: microphone capture + VAD + transcription client
+# ------------------------------------------------------------
+app:
+  image:
+    repository: ghcr.io/y-sera/audio-app/audio-app
+    # Defaults to .Chart.AppVersion when empty.
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  logLevel: INFO
+
+  # Prompt sent with each utterance. Empty uses the app's built-in
+  # Japanese transcription prompt.
+  transcriptionPrompt: ""
+
+  # OpenAI-compatible API settings. When llm.enabled is true, baseUrl is
+  # derived from the bundled LiteRT-LM service and model from llm.model.id.
+  openai:
+    apiKey: dummy
+    baseUrl: ""
+    model: ""
+    # input_audio: OpenAI API compatible (e.g. ollama)
+    # audio:       LiteRT-LM compatible
+    audioInputType: audio
+
+  vad:
+    threshold: 0.3
+    thresholdEnd: 0.2
+    gain: 1.0
+    autoNorm: true
+    targetPeak: 0.6
+    maxNormGain: 16.0
+    clipLimit: 0.02
+    minSpeechMs: 150
+    minSilenceMs: 700
+
+  # How /dev/snd is exposed to the container.
+  audioDevice:
+    # devicePlugin: request an extended resource advertised by a device
+    #               plugin (e.g. squat/generic-device-plugin) on the node.
+    # hostPath:     mount the host's /dev/snd and run privileged.
+    mode: devicePlugin
+    resourceName: devic.es/audio
+    hostPath: /dev/snd
+
+  # Where the WAV of each utterance is written.
+  recordings:
+    path: /data/recordings
+    persistence:
+      enabled: false
+      storageClassName: ""
+      size: 1Gi
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ------------------------------------------------------------
+# LiteRT-LM: OpenAI-compatible LLM server (Gemma)
+# ------------------------------------------------------------
+llm:
+  # Set to false to use an external OpenAI-compatible endpoint
+  # (then set app.openai.baseUrl and app.openai.model).
+  enabled: true
+
+  image:
+    repository: ghcr.io/y-sera/audio-app/litert-lm
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  # e.g. "nvidia" for GPU nodes. Empty uses the cluster default runtime.
+  runtimeClassName: nvidia
+
+  port: 8080
+  verbose: true
+
+  model:
+    # Model ID registered with `litert-lm import` and requested by the app.
+    id: gemma-4-E2B-it.litertlm
+    # Downloaded by an init container when not yet present in the cache.
+    download:
+      enabled: true
+      huggingfaceRepo: litert-community/gemma-4-E2B-it-litert-lm
+      file: gemma-4-E2B-it.litertlm
+      # Optional Secret (key: token) for gated HuggingFace repositories.
+      tokenSecretName: ""
+    # cpu | gpu | npu
+    backend: gpu
+    audioBackend: cpu
+
+  persistence:
+    enabled: true
+    storageClassName: ""
+    accessMode: ReadWriteOnce
+    size: 5Gi
+
+  service:
+    type: ClusterIP
+
+  resources:
+    requests:
+      cpu: "2"
+      memory: 3000Mi
+    limits:
+      cpu: "4"
+      memory: 6000Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}

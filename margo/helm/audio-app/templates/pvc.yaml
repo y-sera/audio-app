@@ -1,0 +1,37 @@
+{{- if .Values.app.recordings.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "audio-app.fullname" . }}-recordings
+  labels:
+    {{- include "audio-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  {{- with .Values.app.recordings.persistence.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.app.recordings.persistence.size }}
+{{- end }}
+{{- if and .Values.llm.enabled .Values.llm.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "audio-app.llmFullname" . }}-models
+  labels:
+    {{- include "audio-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: llm
+spec:
+  {{- with .Values.llm.persistence.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  accessModes:
+    - {{ .Values.llm.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.llm.persistence.size }}
+{{- end }}

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: audio-app
+description: >-
+  Microphone transcription app. Detects speech with Silero VAD and transcribes
+  each utterance with a LiteRT-LM (OpenAI-compatible) server running Gemma.
+type: application
+# Must match ComponentProperties.revision in the Margo application description.
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - audio
+  - transcription
+  - vad
+  - llm

@@ -1,0 +1,150 @@
+{{- if .Values.llm.enabled }}
+{{- $modelDir := printf "/root/.litert-lm/models/%s" (.Values.llm.model.id | replace "/" "--") }}
+{{- $modelConfig := dict "backend" .Values.llm.model.backend "audio_backend" .Values.llm.model.audioBackend }}
+{{- $config := dict "default" (dict) "models" (dict .Values.llm.model.id $modelConfig) | toPrettyJson }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "audio-app.llmFullname" . }}-config
+  labels:
+    {{- include "audio-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: llm
+data:
+  config.json: |
+    {{- $config | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "audio-app.llmFullname" . }}
+  labels:
+    {{- include "audio-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: llm
+spec:
+  type: {{ .Values.llm.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.llm.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "audio-app.llmSelectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "audio-app.llmFullname" . }}
+  labels:
+    {{- include "audio-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: llm
+spec:
+  replicas: 1
+  # The model cache volume is ReadWriteOnce.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "audio-app.llmSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "audio-app.llmSelectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ $config | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.llm.runtimeClassName }}
+      runtimeClassName: {{ . }}
+      {{- end }}
+      {{- if .Values.llm.model.download.enabled }}
+      initContainers:
+        - name: download-model
+          image: "{{ .Values.llm.image.repository }}:{{ .Values.llm.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.llm.image.pullPolicy }}
+          command:
+            - sh
+            - -ec
+            - |
+              if [ -f "{{ $modelDir }}/model.litertlm" ]; then
+                echo "Model {{ .Values.llm.model.id }} already present, skipping download"
+                exit 0
+              fi
+              litert-lm import \
+                --from-huggingface-repo={{ .Values.llm.model.download.huggingfaceRepo | quote }} \
+                {{ .Values.llm.model.download.file | quote }} \
+                {{ .Values.llm.model.id | quote }}
+          {{- with .Values.llm.model.download.tokenSecretName }}
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: token
+          {{- end }}
+          volumeMounts:
+            - name: models
+              mountPath: /root/.litert-lm/models
+      {{- end }}
+      containers:
+        - name: main
+          image: "{{ .Values.llm.image.repository }}:{{ .Values.llm.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.llm.image.pullPolicy }}
+          args:
+            - litert-lm
+            - serve
+            - --host=0.0.0.0
+            - --port={{ .Values.llm.port }}
+            - --config=/etc/litert-lm/config.json
+            {{- if .Values.llm.verbose }}
+            - --verbose
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.llm.port }}
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /v1/models
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /v1/models
+              port: http
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.llm.resources | nindent 12 }}
+          volumeMounts:
+            - name: models
+              mountPath: /root/.litert-lm/models
+            - name: config
+              mountPath: /etc/litert-lm
+              readOnly: true
+      volumes:
+        - name: models
+          {{- if .Values.llm.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "audio-app.llmFullname" . }}-models
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: config
+          configMap:
+            name: {{ include "audio-app.llmFullname" . }}-config
+      {{- with .Values.llm.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.llm.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.llm.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
