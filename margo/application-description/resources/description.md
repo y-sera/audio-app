@@ -23,7 +23,7 @@ into text, entirely on the device.
 
 ## Device requirements
 
-- amd64 CPU with at least 2.5 cores, 4 GiB of memory and 10 GiB of storage
+- amd64 or arm64 CPU with at least 2.5 cores, 4 GiB of memory and 10 GiB of storage
 - A USB microphone (ALSA, `/dev/snd`)
   - Kubernetes: a device plugin that advertises `/dev/snd` as an extended resource
     (default `devic.es/audio`)

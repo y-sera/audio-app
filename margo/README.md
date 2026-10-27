@@ -46,8 +46,23 @@ scripts/push_app_package.sh    # margo.yaml + resources + oras push
 ```
 
 `PUSH=false` builds/packages locally without pushing. `REGISTRY`, `VERSION` and
-`PLATFORMS` (default `linux/amd64`) can be overridden; the scripts refuse to run when the
+`PLATFORMS` (default `linux/amd64,linux/arm64`; a single platform with `PUSH=false`) can be overridden; the scripts refuse to run when the
 versions in `Chart.yaml`, `margo.yaml` and `compose.yaml` don't match `VERSION`.
+
+### GitHub Actions
+
+Both workflows run only on manual dispatch (Actions tab → *Run workflow*).
+
+| Workflow | What it does |
+| --- | --- |
+| `ci.yml` | Static checks (versions, Helm render rules, Compose, `margo.yaml` schema) → builds both images natively on amd64 and arm64 runners → E2E on k3s per architecture |
+| `release.yml` | From `main` only: runs `ci.yml`, then pushes the **tested** images as a multi-arch manifest, plus the chart, Compose archive and application package (`release` environment) |
+
+The E2E test (`test/e2e/`) deploys only the LiteRT-LM server (`app.enabled=false`, CPU
+backend), sends `test/e2e/fixtures/sample.wav` to it and passes when the transcription
+contains every keyword in `expected-keywords.txt`. Until those fixtures exist it only checks
+that the server starts and lists the model. The model is kept in the Actions cache and
+mounted through `llm.persistence.existingClaim`, so it is downloaded only on a cache miss.
 
 Validate the application description against the spec schema:
 
@@ -66,7 +81,7 @@ uvx -p 3.12 --from linkml linkml validate \
   `docker compose publish` is not used (incompatible with Margo).
 - **Parameters**: Helm targets use `--set` dot notation; Compose targets are environment
   variables consumed via `${VAR:-default}` interpolation in `compose.yaml`.
-- **Device constraints**: amd64, 2.5 cores, 4096Mi memory, 10Gi storage, plus an
+- **Device constraints**: amd64 or arm64, 2.5 cores, 4096Mi memory, 10Gi storage, plus an
   eligibility rule requiring a `microphone` peripheral. No GPU is required.
 
 ## Device prerequisites

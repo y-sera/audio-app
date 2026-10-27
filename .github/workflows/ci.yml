@@ -1,0 +1,254 @@
+# Static checks, multi-arch image build and k3s E2E test.
+#
+# Security: manual dispatch only (requires write access), or called by the
+# release workflow. No pull_request(_target) trigger, read-only token, and
+# every action pinned to a full commit SHA.
+name: CI
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      version:
+        description: Application version built and tested
+        value: ${{ jobs.build.outputs.version }}
+
+permissions: {}
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository }}
+  HELM_VERSION: v4.3.1
+  UV_VERSION: 0.13.6
+
+jobs:
+  lint:
+    name: Static checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      # margo/specification at a pinned commit, verified by checksum.
+      SPEC_SCHEMA_URL: https://raw.githubusercontent.com/margo/specification/2eca50a38a9265942b9f8d8ee3138a17fe0ebce3/src/specification/applications/application-description.linkml.yaml
+      SPEC_SCHEMA_SHA256: a0a97f69e666512efe1812aa57db39e4c6a37ea3c6a614620b6a1f16003757e0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Check versions are consistent
+        run: |
+          source margo/scripts/env.sh
+          VERSION="$(yq '.version' margo/helm/audio-app/Chart.yaml)" check_versions
+
+      - name: Python syntax
+        run: python3 -m compileall -q app/audio-app/src test/e2e
+
+      - name: Helm lint and render
+        run: test/lint/check-chart.sh margo/helm/audio-app
+
+      - name: Compose config
+        run: docker compose -f margo/compose/audio-app-compose/compose.yaml config -q
+
+      - name: Validate application description
+        run: |
+          schema="${RUNNER_TEMP}/application-description.linkml.yaml"
+          curl -fsSL --retry 3 -o "${schema}" "${SPEC_SCHEMA_URL}"
+          echo "${SPEC_SCHEMA_SHA256}  ${schema}" | sha256sum -c -
+          uvx --python 3.12 --from 'linkml==1.12.1' linkml validate \
+            --schema "${schema}" \
+            --target-class ApplicationDescription \
+            margo/application-description/margo.yaml
+
+  build:
+    name: Build images (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read version
+        id: version
+        run: |
+          version="$(sed -n 's/^appVersion: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' margo/helm/audio-app/Chart.yaml)"
+          test -n "${version}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build audio-app
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: app/audio-app
+          platforms: linux/${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/audio-app:${{ steps.version.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.description=audio-app: microphone capture, VAD and transcription client
+          provenance: false
+          outputs: type=docker,dest=${{ runner.temp }}/images/audio-app.tar
+          cache-from: type=gha,scope=audio-app-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=audio-app-${{ matrix.arch }}
+
+      - name: Build litert-lm
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: app/litert-lm
+          platforms: linux/${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/litert-lm:${{ steps.version.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.description=LiteRT-LM OpenAI-compatible server for audio-app
+          provenance: false
+          outputs: type=docker,dest=${{ runner.temp }}/images/litert-lm.tar
+          cache-from: type=gha,scope=litert-lm-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=litert-lm-${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: images-${{ matrix.arch }}
+          path: ${{ runner.temp }}/images/*.tar
+          retention-days: 3
+          compression-level: 1
+          if-no-files-found: error
+
+  e2e:
+    name: E2E on k3s (${{ matrix.arch }})
+    needs: [lint, build]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      NAMESPACE: audio-app-e2e
+      RELEASE: audio-app
+      MODEL_ID: gemma-4-E2B-it.litertlm
+      MODEL_HF_REPO: litert-community/gemma-4-E2B-it-litert-lm
+      MODEL_HF_FILE: gemma-4-E2B-it.litertlm
+      MODEL_CACHE_DIR: ${{ github.workspace }}/.e2e/models
+      E2E_OUT: ${{ github.workspace }}/.e2e/out
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: images-${{ matrix.arch }}
+          path: ${{ runner.temp }}/images
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Start k3s
+        run: test/e2e/setup-k3s.sh
+
+      - name: Import images
+        run: |
+          for image in "${RUNNER_TEMP}"/images/*.tar; do
+            sudo k3s ctr images import "${image}"
+          done
+          sudo k3s ctr images ls -q | grep "${REGISTRY}/"
+
+      - name: Restore model cache
+        id: model-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .e2e/models
+          key: litert-lm-model-${{ env.MODEL_HF_REPO }}-${{ env.MODEL_HF_FILE }}-${{ env.MODEL_ID }}
+
+      - name: Provision model cache volume
+        run: |
+          mkdir -p "${MODEL_CACHE_DIR}" "${E2E_OUT}"
+          kubectl create namespace "${NAMESPACE}"
+          sed -e "s|\${MODEL_CACHE_DIR}|${MODEL_CACHE_DIR}|g" -e "s|\${NAMESPACE}|${NAMESPACE}|g" \
+            test/e2e/model-cache.yaml | kubectl apply -f -
+
+      - name: Install chart (LiteRT-LM only, CPU)
+        run: |
+          helm upgrade --install "${RELEASE}" margo/helm/audio-app \
+            --namespace "${NAMESPACE}" \
+            --set app.enabled=false \
+            --set llm.model.backend=cpu \
+            --set llm.image.pullPolicy=Never \
+            --set llm.persistence.existingClaim=e2e-models \
+            --set-string llm.model.id="${MODEL_ID}" \
+            --set-string llm.model.download.huggingfaceRepo="${MODEL_HF_REPO}" \
+            --set-string llm.model.download.file="${MODEL_HF_FILE}" \
+            --wait --timeout 30m
+
+      - name: Transcription test
+        run: |
+          kubectl -n "${NAMESPACE}" port-forward "svc/${RELEASE}-llm" 18080:8080 \
+            > "${E2E_OUT}/port-forward.log" 2>&1 &
+          python3 test/e2e/transcribe_test.py \
+            --base-url http://127.0.0.1:18080/v1 \
+            --model "${MODEL_ID}" \
+            --audio test/e2e/fixtures/sample.wav \
+            --keywords test/e2e/fixtures/expected-keywords.txt \
+            --output "${E2E_OUT}/transcription.txt" \
+            --allow-missing-fixture
+
+      - name: Collect diagnostics
+        if: failure()
+        run: test/e2e/collect-diagnostics.sh "${NAMESPACE}" "${E2E_OUT}/diagnostics"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: e2e-${{ matrix.arch }}
+          path: .e2e/out
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Check downloaded model
+        id: model
+        if: always() && steps.model-cache.outputs.cache-hit != 'true'
+        run: |
+          if sudo test -f "${MODEL_CACHE_DIR}/${MODEL_ID//\//--}/model.litertlm"; then
+            # Written as root by the init container.
+            sudo chmod -R a+rX "${MODEL_CACHE_DIR}"
+            echo "complete=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Save model cache
+        if: always() && steps.model.outputs.complete == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .e2e/models
+          key: ${{ steps.model-cache.outputs.cache-primary-key }}

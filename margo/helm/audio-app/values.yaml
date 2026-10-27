@@ -13,6 +13,10 @@ imagePullSecrets: []
 # audio-app: microphone capture + VAD + transcription client
 # ------------------------------------------------------------
 app:
+  # Set to false to deploy only the LiteRT-LM server (e.g. on hosts without a
+  # microphone, such as CI).
+  enabled: true
+
   image:
     repository: ghcr.io/y-sera/audio-app/audio-app
     # Defaults to .Chart.AppVersion when empty.
@@ -115,6 +119,8 @@ llm:
 
   persistence:
     enabled: true
+    # Use an existing PVC for the model cache instead of creating one.
+    existingClaim: ""
     storageClassName: ""
     accessMode: ReadWriteOnce
     size: 5Gi

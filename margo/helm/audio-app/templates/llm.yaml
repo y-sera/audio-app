@@ -140,7 +140,7 @@ spec:
         - name: models
           {{- if .Values.llm.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "audio-app.llmFullname" . }}-models
+            claimName: {{ .Values.llm.persistence.existingClaim | default (printf "%s-models" (include "audio-app.llmFullname" .)) }}
           {{- else }}
           emptyDir: {}
           {{- end }}

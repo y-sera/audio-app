@@ -1,4 +1,4 @@
-{{- if .Values.app.recordings.persistence.enabled }}
+{{- if and .Values.app.enabled .Values.app.recordings.persistence.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -16,7 +16,7 @@ spec:
     requests:
       storage: {{ .Values.app.recordings.persistence.size }}
 {{- end }}
-{{- if and .Values.llm.enabled .Values.llm.persistence.enabled }}
+{{- if and .Values.llm.enabled .Values.llm.persistence.enabled (not .Values.llm.persistence.existingClaim) }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

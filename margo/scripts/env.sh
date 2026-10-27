@@ -11,13 +11,15 @@ DIST_DIR="${MARGO_DIR}/dist"
 
 REGISTRY="${REGISTRY:-ghcr.io/y-sera/audio-app}"
 VERSION="${VERSION:-0.1.0}"
-PLATFORMS="${PLATFORMS:-linux/amd64}"
+PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 
 APP_IMAGE="${REGISTRY}/audio-app"
 LLM_IMAGE="${REGISTRY}/litert-lm"
 CHART_REPO="${REGISTRY}/charts"            # chart lands at ${CHART_REPO}/audio-app
 COMPOSE_REPO="${REGISTRY}/compose/audio-app-compose"
 APP_PACKAGE_REPO="${REGISTRY}/margo-package"
+# Links pushed OCI artifacts to the repository on GHCR.
+SOURCE_URL="${SOURCE_URL:-https://github.com/y-sera/audio-app}"
 
 require() {
   for cmd in "$@"; do

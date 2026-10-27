@@ -30,5 +30,6 @@ if [ "${PUSH:-true}" = "true" ]; then
     --annotation "org.opencontainers.image.title=${name}" \
     --annotation "org.opencontainers.image.version=${VERSION}" \
     --annotation "org.opencontainers.image.authors=y-sera" \
-    --annotation "org.opencontainers.image.description=audio-app with a LiteRT-LM server (Compose)"
+    --annotation "org.opencontainers.image.description=audio-app with a LiteRT-LM server (Compose)" \
+    --annotation "org.opencontainers.image.source=${SOURCE_URL}"
 fi

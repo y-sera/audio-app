@@ -46,6 +46,7 @@ deploymentProfiles:
           cores: 2.5
           architectures:
             - amd64
+            - arm64
         memory: 4096Mi
         storage: 10Gi
       eligibilityRules:
@@ -76,6 +77,7 @@ deploymentProfiles:
           cores: 2.5
           architectures:
             - amd64
+            - arm64
         memory: 4096Mi
         storage: 10Gi
       eligibilityRules:

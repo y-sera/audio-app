@@ -10,6 +10,11 @@ PUSH="${PUSH:-true}"
 if [ "${PUSH}" = "true" ]; then
   output=(--push)
 else
+  # --load can only import a single platform into the local image store.
+  if [[ "${PLATFORMS}" == *,* ]]; then
+    echo "error: set PLATFORMS to one platform (e.g. linux/amd64) with PUSH=false" >&2
+    exit 1
+  fi
   output=(--load)
 fi
 

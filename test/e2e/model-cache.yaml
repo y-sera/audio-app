@@ -1,0 +1,35 @@
+# Pre-provisioned model cache for the E2E test. The hostPath directory is
+# restored from and saved to the GitHub Actions cache, so the model is
+# downloaded only on a cache miss. ${MODEL_CACHE_DIR} and ${NAMESPACE} are
+# substituted by the workflow.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: e2e-models
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: ${MODEL_CACHE_DIR}
+    type: DirectoryOrCreate
+  claimRef:
+    namespace: ${NAMESPACE}
+    name: e2e-models
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: e2e-models
+  namespace: ${NAMESPACE}
+spec:
+  storageClassName: ""
+  volumeName: e2e-models
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

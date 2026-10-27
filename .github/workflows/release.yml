@@ -1,0 +1,139 @@
+# Builds and tests via the CI workflow, then publishes the tested images,
+# the Helm chart, the Compose archive and the Margo application package to
+# GHCR.
+#
+# Security: manual dispatch from main only. Only the publish job gets
+# packages:write, and it runs in the "release" environment, which is
+# restricted to the main branch.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (SemVer without "v"); must match Chart.yaml and margo.yaml
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository }}
+  HELM_VERSION: v4.3.1
+  ORAS_VERSION: 1.3.6
+
+jobs:
+  check:
+    name: Check release inputs
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "${INPUT_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version: ${INPUT_VERSION}"
+            exit 1
+          fi
+          source margo/scripts/env.sh
+          VERSION="${INPUT_VERSION}" check_versions
+
+  test:
+    name: CI
+    needs: check
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish to GHCR
+    needs: [check, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: images-*
+          path: ${{ runner.temp }}/images
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push tested images
+        run: |
+          for name in audio-app litert-lm; do
+            image="${REGISTRY}/${name}"
+            sources=()
+            for arch in amd64 arm64; do
+              docker load -i "${RUNNER_TEMP}/images/images-${arch}/${name}.tar"
+              docker tag "${image}:${VERSION}" "${image}:${VERSION}-${arch}"
+              docker push "${image}:${VERSION}-${arch}"
+              sources+=("${image}:${VERSION}-${arch}")
+            done
+            docker buildx imagetools create -t "${image}:${VERSION}" "${sources[@]}"
+            docker buildx imagetools inspect "${image}:${VERSION}"
+          done
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4 # v2.0.2
+        with:
+          version: ${{ env.ORAS_VERSION }}
+
+      - name: Log in helm and oras
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          echo "${GHCR_TOKEN}" | helm registry login ghcr.io -u "${GHCR_USER}" --password-stdin
+          echo "${GHCR_TOKEN}" | oras login ghcr.io -u "${GHCR_USER}" --password-stdin
+
+      - name: Push Helm chart
+        run: margo/scripts/package_helm.sh
+
+      - name: Push Compose archive
+        run: margo/scripts/package_compose.sh
+
+      - name: Push Margo application package
+        run: margo/scripts/push_app_package.sh
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published ${VERSION}"
+            echo
+            echo "| Artifact | Reference |"
+            echo "| --- | --- |"
+            echo "| audio-app image | \`${REGISTRY}/audio-app:${VERSION}\` |"
+            echo "| litert-lm image | \`${REGISTRY}/litert-lm:${VERSION}\` |"
+            echo "| Helm chart | \`oci://${REGISTRY}/charts/audio-app:${VERSION}\` |"
+            echo "| Compose archive | \`oci://${REGISTRY}/compose/audio-app-compose:${VERSION}\` |"
+            echo "| Application package | \`${REGISTRY}/margo-package:${VERSION}\` |"
+          } >> "${GITHUB_STEP_SUMMARY}"

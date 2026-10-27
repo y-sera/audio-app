@@ -7,6 +7,11 @@ type: application
 # Must match ComponentProperties.revision in the Margo application description.
 version: 0.1.0
 appVersion: "0.1.0"
+home: https://github.com/y-sera/audio-app
+# Helm maps sources[0] to the org.opencontainers.image.source annotation,
+# which links the pushed chart to this repository on GHCR.
+sources:
+  - https://github.com/y-sera/audio-app
 keywords:
   - audio
   - transcription

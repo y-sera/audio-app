@@ -8,8 +8,9 @@ check_versions
 
 annotations="$(mktemp)"
 trap 'rm -f "${annotations}"' EXIT
-cat > "${annotations}" <<'EOF'
+cat > "${annotations}" <<EOF
 {
+  "\$manifest": { "org.opencontainers.image.source": "${SOURCE_URL}" },
   "resources/description.md": { "org.margo.app.resource": "descriptionFile" },
   "resources/release-notes.md": { "org.margo.app.resource": "releaseNotes" },
   "resources/license.md": { "org.margo.app.resource": "licenseFile" },
