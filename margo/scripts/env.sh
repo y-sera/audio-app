@@ -1,7 +1,7 @@
 # Shared settings for the packaging scripts. Source, don't execute.
 #
 # The registry is provisional. When it changes, also update the references in:
-#   helm/audio-app/values.yaml                          (app/llm image.repository)
+#   helm/audio-app/values.yaml                          (app/llm/ui image.repository)
 #   compose/audio-app-compose/compose.yaml              (services.*.image)
 #   application-description/margo.yaml                  (components[].properties.repository)
 
@@ -15,6 +15,7 @@ PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 
 APP_IMAGE="${REGISTRY}/audio-app"
 LLM_IMAGE="${REGISTRY}/litert-lm"
+UI_IMAGE="${REGISTRY}/ui"
 CHART_REPO="${REGISTRY}/charts"            # chart lands at ${CHART_REPO}/audio-app
 COMPOSE_REPO="${REGISTRY}/compose/audio-app-compose"
 APP_PACKAGE_REPO="${REGISTRY}/margo-package"

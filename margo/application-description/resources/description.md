@@ -13,6 +13,9 @@ into text, entirely on the device.
 3. **Transcription** – each utterance is saved as a WAV file and sent to a local
    OpenAI-compatible endpoint served by [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM)
    running Google's Gemma 4 E2B model. The transcription is written to the application log.
+4. **Web UI** (optional) – a web page lists the transcripts as they are recognized, with a
+   live connection indicator, a filter and copy-to-clipboard. It is served on port `30080`
+   of the device by default.
 
 ## Components
 
@@ -20,6 +23,7 @@ into text, entirely on the device.
 | --- | --- | --- |
 | audio-app | `ghcr.io/y-sera/audio-app/audio-app` | Microphone capture, VAD, transcription client |
 | litert-lm | `ghcr.io/y-sera/audio-app/litert-lm` | OpenAI-compatible LLM server (Gemma 4 E2B) |
+| ui | `ghcr.io/y-sera/audio-app/ui` | Web UI showing the transcripts (optional) |
 
 ## Device requirements
 
@@ -37,6 +41,8 @@ into text, entirely on the device.
 | Parameter | Default | Description |
 | --- | --- | --- |
 | Log Level | `INFO` | Log level of the audio-app |
+| Enable Web UI | `true` | Serve the web page showing the transcripts |
+| Web UI Port | `30080` | Port of the web UI on the device (30000-32767) |
 | Transcription Prompt | English transcription instruction | Instruction sent with each utterance |
 | Start Threshold | `0.3` | VAD speech probability that starts a recording |
 | End Threshold | `0.2` | VAD speech probability below which a recording may end |

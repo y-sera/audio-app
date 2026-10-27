@@ -16,10 +16,15 @@ from .config import (
     FORMAT,
     INPUT_CHUNK,
     OUTPUT_DIR,
+    TRANSCRIPT_API_ENABLED,
     VAD_MODEL_PATH,
 )
 from .logging_config import logger
 from .segmentation import UtteranceSegmenter
+from .transcript_server import (
+    start_transcript_server,
+    transcripts,
+)
 from .transcription import (
     OPENAI_BASE_URL,
     OPENAI_MODEL,
@@ -95,6 +100,11 @@ def process_recording(
             text,
         )
 
+        transcripts.add(
+            text,
+            utterance_id,
+        )
+
     else:
         logger.warning(
             "Transcription failed for recording #%04d",
@@ -136,6 +146,13 @@ def main():
         "  vad_model=%s",
         VAD_MODEL_PATH,
     )
+
+    # --------------------------------------------------------
+    # Transcript API for the UI
+    # --------------------------------------------------------
+
+    if TRANSCRIPT_API_ENABLED:
+        start_transcript_server()
 
     # --------------------------------------------------------
     # Load the VAD model

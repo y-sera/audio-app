@@ -63,3 +63,16 @@ VAD_MODEL_PATH = os.getenv(
     "VAD_MODEL_PATH",
     "/app/models/silero_vad.onnx",
 )
+
+# Read-only HTTP API (JSON + Server-Sent Events) that the UI reads the
+# transcripts from. Off by default; the deployments enable it together
+# with the UI.
+TRANSCRIPT_API_ENABLED = os.getenv(
+    "TRANSCRIPT_API_ENABLED",
+    "false",
+).lower() in ("1", "true", "yes")
+TRANSCRIPT_API_HOST = os.getenv("TRANSCRIPT_API_HOST", "0.0.0.0")
+TRANSCRIPT_API_PORT = int(os.getenv("TRANSCRIPT_API_PORT", "8000"))
+
+# Number of recent transcripts kept in memory for the UI.
+TRANSCRIPT_HISTORY = int(os.getenv("TRANSCRIPT_HISTORY", "200"))

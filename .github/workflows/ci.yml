@@ -124,6 +124,30 @@ jobs:
             --entrypoint /app/.venv/bin/python \
             "${IMAGE}" /test/smoke/audio_app_smoke.py /test/e2e/fixtures/sample.wav
 
+      - name: Build ui
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: app/ui
+          platforms: linux/${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/ui:${{ steps.version.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.description=Web UI showing the audio-app transcripts
+          provenance: false
+          outputs: type=docker,dest=${{ runner.temp }}/images/ui.tar
+          cache-from: type=gha,scope=ui-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=ui-${{ matrix.arch }}
+
+      - name: Smoke test ui image
+        env:
+          APP_IMAGE: ${{ env.REGISTRY }}/audio-app:${{ steps.version.outputs.version }}
+          UI_IMAGE: ${{ env.REGISTRY }}/ui:${{ steps.version.outputs.version }}
+        run: |
+          docker load -i "${RUNNER_TEMP}/images/ui.tar"
+          test/smoke/ui_smoke.sh "${APP_IMAGE}" "${UI_IMAGE}"
+
       - name: Build litert-lm
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

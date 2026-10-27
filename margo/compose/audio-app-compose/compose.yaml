@@ -81,6 +81,9 @@ services:
       VAD_CLIP_LIMIT: ${VAD_CLIP_LIMIT:-0.02}
       MIN_SPEECH_MS: ${MIN_SPEECH_MS:-150}
       MIN_SILENCE_MS: ${MIN_SILENCE_MS:-700}
+      # The transcript API is served only for the UI.
+      TRANSCRIPT_API_ENABLED: ${UI_ENABLED:-true}
+      TRANSCRIPT_API_PORT: "8000"
     # ALSA capture device (USB microphone) from the host.
     devices:
       - /dev/snd:/dev/snd
@@ -91,6 +94,25 @@ services:
         limits:
           cpus: "1"
           memory: 512M
+
+  # Web UI showing the transcripts at http://<host>:${UI_PORT}.
+  # With UI_ENABLED=false the container idles without serving: Compose
+  # cannot drop a service based on a variable.
+  ui:
+    image: ghcr.io/y-sera/audio-app/ui:0.1.1
+    restart: unless-stopped
+    depends_on:
+      - audio-app
+    environment:
+      UI_ENABLED: ${UI_ENABLED:-true}
+      API_UPSTREAM: audio-app:8000
+    ports:
+      - ${UI_PORT:-30080}:8080
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 64M
 
 volumes:
   litert-lm-models:

@@ -5,6 +5,7 @@ metadata:
   description: >-
     Captures audio from a USB microphone, detects utterances with Silero VAD
     and transcribes each one with a locally hosted Gemma model served by LiteRT-LM.
+    An optional web UI shows the transcripts as they are recognized.
   # MUST equal the tag of the Application Package in the Application Registry.
   version: 0.1.1
   catalog:
@@ -25,7 +26,8 @@ deploymentProfiles:
   - type: helm
     id: y-sera-audio-app-helm-a
     description: >-
-      Deploys the audio-app and a LiteRT-LM server as a single Helm chart on Kubernetes.
+      Deploys the audio-app, a LiteRT-LM server and an optional web UI as a single Helm
+      chart on Kubernetes. The UI is exposed as a NodePort service.
       The device needs a USB microphone, requested by default as the extended resource
       "devic.es/audio", which must be advertised by a device plugin
       (e.g. squat/generic-device-plugin) installed on the node.
@@ -62,7 +64,7 @@ deploymentProfiles:
   - type: compose
     id: y-sera-audio-app-compose-a
     description: >-
-      Deploys the audio-app and a LiteRT-LM server with Compose. The device needs a
+      Deploys the audio-app, a LiteRT-LM server and an optional web UI with Compose. The device needs a
       USB microphone exposed as /dev/snd. Inference runs on the CPU only.
     components:
       - name: audio-app-compose
@@ -138,6 +140,20 @@ parameters:
     targets:
       - pointer: llm.model.backend
         components: ["audio-app"]
+  uiEnabled:
+    value: true
+    targets:
+      - pointer: ui.enabled
+        components: ["audio-app"]
+      - pointer: UI_ENABLED
+        components: ["audio-app-compose"]
+  uiPort:
+    value: 30080
+    targets:
+      - pointer: ui.service.nodePort
+        components: ["audio-app"]
+      - pointer: UI_PORT
+        components: ["audio-app-compose"]
   audioDeviceResourceName:
     value: devic.es/audio
     targets:
@@ -155,6 +171,21 @@ configuration:
           name: Transcription Prompt
           description: Instruction sent to the LLM together with each recorded utterance.
           schema: requiredText
+    - name: User Interface
+      settings:
+        - parameter: uiEnabled
+          name: Enable Web UI
+          description: >-
+            Serves a web page that shows the transcripts as they are recognized.
+            When disabled, the UI is not deployed (Helm) or does not serve anything (Compose),
+            and the audio-app does not open its transcript API.
+          schema: toggle
+        - parameter: uiPort
+          name: Web UI Port
+          description: >-
+            Port on the device where the web UI is served: the NodePort of the UI service
+            (Helm) or the published host port (Compose).
+          schema: nodePort
     - name: Voice Activity Detection
       settings:
         - parameter: vadThreshold
@@ -202,6 +233,15 @@ configuration:
       dataType: integer
       minValue: 0
       maxValue: 10000
+      allowEmpty: false
+    - name: toggle
+      dataType: boolean
+      allowEmpty: false
+    - name: nodePort
+      dataType: integer
+      # The Kubernetes NodePort range, so the same value works for both profiles.
+      minValue: 30000
+      maxValue: 32767
       allowEmpty: false
     - name: logLevelSelect
       dataType: string

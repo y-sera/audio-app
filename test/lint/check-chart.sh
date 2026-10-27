@@ -28,6 +28,8 @@ render host-audio --set app.audioDevice.mode=hostPath
 render llm-only --set app.enabled=false
 render external-llm --set llm.enabled=false \
   --set app.openai.baseUrl=http://llm:8080/v1 --set app.openai.model=model
+render no-ui --set ui.enabled=false
+render ui-cluster-ip --set ui.service.type=ClusterIP
 render persistence --set app.recordings.persistence.enabled=true \
   --set llm.persistence.existingClaim=models
 
@@ -37,6 +39,24 @@ if grep -n 'runtimeClassName' "${out}/default.yaml"; then
   exit 1
 fi
 grep -q 'runtimeClassName: nvidia' "${out}/gpu.yaml"
+
+# The UI and the transcript API are rendered only together, and only with
+# the app.
+grep -q 'name: ci-audio-app-ui$' "${out}/default.yaml"
+grep -q 'nodePort: 30080' "${out}/default.yaml"
+grep -A1 'TRANSCRIPT_API_ENABLED' "${out}/default.yaml" | grep -q '"true"'
+grep -A1 'TRANSCRIPT_API_ENABLED' "${out}/no-ui.yaml" | grep -q '"false"'
+for name in no-ui llm-only; do
+  if grep -nE 'name: ci-audio-app-(ui|api)$' "${out}/${name}.yaml"; then
+    echo "error: ${name} render contains UI objects" >&2
+    exit 1
+  fi
+done
+if grep -n 'nodePort' "${out}/ui-cluster-ip.yaml"; then
+  echo "error: ClusterIP UI service has a nodePort" >&2
+  exit 1
+fi
+echo "ok: UI toggling"
 
 # Invalid values must fail.
 if helm template ci "${chart}" --set llm.model.backend=npu > /dev/null 2>&1; then

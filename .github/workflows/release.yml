@@ -87,7 +87,7 @@ jobs:
 
       - name: Push tested images
         run: |
-          for name in audio-app litert-lm; do
+          for name in audio-app litert-lm ui; do
             image="${REGISTRY}/${name}"
             sources=()
             for arch in amd64 arm64; do
@@ -134,6 +134,7 @@ jobs:
             echo "| --- | --- |"
             echo "| audio-app image | \`${REGISTRY}/audio-app:${VERSION}\` |"
             echo "| litert-lm image | \`${REGISTRY}/litert-lm:${VERSION}\` |"
+            echo "| ui image | \`${REGISTRY}/ui:${VERSION}\` |"
             echo "| Helm chart | \`oci://${REGISTRY}/charts/audio-app:${VERSION}\` |"
             echo "| Compose archive | \`oci://${REGISTRY}/compose/audio-app-compose:${VERSION}\` |"
             echo "| Application package | \`${REGISTRY}/margo-package:${VERSION}\` |"

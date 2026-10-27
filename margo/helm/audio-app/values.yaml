@@ -14,7 +14,7 @@ imagePullSecrets: []
 # ------------------------------------------------------------
 app:
   # Set to false to deploy only the LiteRT-LM server (e.g. on hosts without a
-  # microphone, such as CI).
+  # microphone, such as CI). The UI is then not deployed either.
   enabled: true
 
   image:
@@ -56,6 +56,13 @@ app:
     resourceName: devic.es/audio
     hostPath: /dev/snd
 
+  # Read-only transcript API (JSON + Server-Sent Events) read by the UI.
+  # Enabled together with the UI.
+  api:
+    port: 8000
+    # Number of recent transcripts kept in memory.
+    history: 200
+
   # Where the WAV of each utterance is written.
   recordings:
     path: /data/recordings
@@ -71,6 +78,38 @@ app:
     limits:
       cpu: "1"
       memory: 512Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ------------------------------------------------------------
+# UI: web page showing the transcripts (Vite + React on nginx)
+# ------------------------------------------------------------
+ui:
+  # Requires app.enabled.
+  enabled: true
+
+  image:
+    repository: ghcr.io/y-sera/audio-app/ui
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  service:
+    # NodePort makes the UI reachable at http://<node-ip>:<nodePort>.
+    # Use ClusterIP to expose it through an Ingress or port-forward instead.
+    type: NodePort
+    port: 80
+    # Ignored unless type is NodePort; empty lets Kubernetes pick one.
+    nodePort: 30080
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 200m
+      memory: 64Mi
 
   nodeSelector: {}
   tolerations: []

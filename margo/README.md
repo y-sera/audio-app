@@ -1,7 +1,7 @@
 # audio-app Margo package
 
-Packages audio-app (USB microphone → Silero VAD → transcription by Gemma on LiteRT-LM)
-as a Margo application, following `specification/src/specification/applications/`
+Packages audio-app (USB microphone → Silero VAD → transcription by Gemma on LiteRT-LM,
+with an optional web UI showing the transcripts) as a Margo application, following `specification/src/specification/applications/`
 and `specification/system-design/specification/applications/application-registry.md`.
 
 > The registry `ghcr.io/y-sera/audio-app` is provisional. See [Changing the registry](#changing-the-registry).
@@ -25,6 +25,7 @@ margo/
 | --- | --- | --- |
 | audio-app image | `ghcr.io/y-sera/audio-app/audio-app:0.1.1` | container image |
 | litert-lm image | `ghcr.io/y-sera/audio-app/litert-lm:0.1.1` | container image |
+| ui image | `ghcr.io/y-sera/audio-app/ui:0.1.1` (from the next release) | container image |
 | Helm chart | `oci://ghcr.io/y-sera/audio-app/charts/audio-app:0.1.1` | Helm OCI chart |
 | Compose archive | `oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose:0.1.1` | `application/vnd.org.margo.component.compose+json` |
 | Application package | `ghcr.io/y-sera/audio-app/margo-package:0.1.1` | `application/vnd.margo.app.v1+json` |
@@ -92,6 +93,24 @@ uvx -p 3.12 --from linkml linkml validate \
   `app.audioDevice.mode=hostPath` (mounts `/dev/snd`, runs privileged).
 - **Compose**: `/dev/snd` on the host.
 - **Both**: access to Hugging Face on first start (model download into a persistent volume).
+
+## Web UI
+
+`app/ui` is a Vite + React page served by nginx. nginx proxies `/api/` to a read-only
+transcript API of the audio-app (`/api/transcripts` as JSON, `/api/events` as
+Server-Sent Events), which is started only when the UI is enabled.
+
+| | Helm | Compose |
+| --- | --- | --- |
+| Toggle (parameter `uiEnabled`) | `ui.enabled`; `false` renders no UI objects | `UI_ENABLED`; `false` leaves the `ui` container idle without serving |
+| Port (parameter `uiPort`) | `ui.service.nodePort` (default `30080`, `ui.service.type: NodePort`) | `UI_PORT`, published host port |
+
+Compose cannot drop a service based on a variable, and an exited container makes the
+deployment look partially failed, so the disabled container keeps running without
+listening. The UI requires `app.enabled`; with `app.enabled=false` it is not deployed.
+
+The API and page have no authentication: anyone who can reach the port can read the
+transcripts. Set `ui.service.type=ClusterIP` (Helm) to keep it inside the cluster.
 
 ## Inference backend
 

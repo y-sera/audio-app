@@ -19,6 +19,18 @@
 {{- printf "%s-llm" (include "audio-app.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "audio-app.uiFullname" -}}
+{{- printf "%s-ui" (include "audio-app.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+The UI needs the transcript API of the audio-app. ui.enabled may arrive
+as a string from parameter overrides, so it is compared as text.
+*/}}
+{{- define "audio-app.uiEnabled" -}}
+{{- if and (eq (toString .Values.ui.enabled) "true") .Values.app.enabled }}true{{- end }}
+{{- end }}
+
 {{- define "audio-app.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
 app.kubernetes.io/name: {{ include "audio-app.name" . }}
@@ -31,6 +43,12 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/name: {{ include "audio-app.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/component: app
+{{- end }}
+
+{{- define "audio-app.uiSelectorLabels" -}}
+app.kubernetes.io/name: {{ include "audio-app.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/component: ui
 {{- end }}
 
 {{- define "audio-app.llmSelectorLabels" -}}

@@ -60,6 +60,18 @@ spec:
               value: {{ .Values.app.vad.minSpeechMs | quote }}
             - name: MIN_SILENCE_MS
               value: {{ .Values.app.vad.minSilenceMs | quote }}
+            - name: TRANSCRIPT_API_ENABLED
+              value: {{ include "audio-app.uiEnabled" . | default "false" | quote }}
+            {{- if include "audio-app.uiEnabled" . }}
+            - name: TRANSCRIPT_API_PORT
+              value: {{ .Values.app.api.port | quote }}
+            - name: TRANSCRIPT_HISTORY
+              value: {{ .Values.app.api.history | quote }}
+          ports:
+            - name: api
+              containerPort: {{ .Values.app.api.port }}
+              protocol: TCP
+            {{- end }}
           {{- if eq .Values.app.audioDevice.mode "hostPath" }}
           securityContext:
             privileged: true

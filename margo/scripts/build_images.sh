@@ -25,3 +25,7 @@ docker buildx build --platform "${PLATFORMS}" "${output[@]}" \
 docker buildx build --platform "${PLATFORMS}" "${output[@]}" \
   -t "${LLM_IMAGE}:${VERSION}" \
   "${APP_SRC_DIR}/litert-lm"
+
+docker buildx build --platform "${PLATFORMS}" "${output[@]}" \
+  -t "${UI_IMAGE}:${VERSION}" \
+  "${APP_SRC_DIR}/ui"
