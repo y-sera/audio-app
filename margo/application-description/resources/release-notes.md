@@ -1,5 +1,15 @@
 # Release Notes
 
+## 0.2.0
+
+- New optional web UI (Vite + React on nginx) that lists the transcripts as they are
+  recognized, with a live connection indicator, a filter and copy-to-clipboard.
+  - Parameters `uiEnabled` (default on) and `uiPort` (default 30080).
+  - Helm: `ui.enabled`, exposed as a NodePort service. Compose: `ui` service on `UI_PORT`.
+  - The audio-app serves a read-only transcript API for the UI only when it is enabled.
+  - The UI has no authentication; anyone who can reach the port can read the transcripts.
+- LiteRT-LM memory limit lowered from 6000Mi to 3000Mi (request 2000Mi).
+
 ## 0.1.1
 
 - Default transcription prompt is now English (instruction and output).

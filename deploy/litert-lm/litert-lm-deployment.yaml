@@ -22,7 +22,7 @@ spec:
       # uncomment the RuntimeClass that exposes the GPU.
       #runtimeClassName: nvidia
       #initContainers:
-      #- image: ghcr.io/y-sera/audio-app/litert-lm:0.1.1
+      #- image: ghcr.io/y-sera/audio-app/litert-lm:0.2.0
       #  name: download-model
       #  command:
       #  - litert-lm
@@ -34,7 +34,7 @@ spec:
       #  - name: cache-volume
       #    mountPath: /root/.litert-lm/models/
       containers:
-      - image: ghcr.io/y-sera/audio-app/litert-lm:0.1.1
+      - image: ghcr.io/y-sera/audio-app/litert-lm:0.2.0
         name: main
         ports:
           - containerPort: 8080
