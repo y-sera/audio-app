@@ -25,24 +25,6 @@ OPENAI_PROMPT = os.getenv(
     ),
 )
 
-# type: input_audio or audio
-#   input_audio: OpenAI API Compatible type(e.g. ollama)
-#   audio: LiteRT-LM type(at v0.18.0)
-#          ref: https://github.com/google-ai-edge/LiteRT-LM/blob/main/docs/api/cpp/conversation.md
-OPENAI_API_AUDIO_INPUT_TYPE = os.getenv("OPENAI_API_AUDIO_INPUT_TYPE", "input_audio")
-
-match OPENAI_API_AUDIO_INPUT_TYPE:
-    case "input_audio":
-        logger.info("OpenAI API audio input type: input_audio. OpenAI API compatible.")
-    case "audio":
-        logger.info("OpenAI API audio input type: audio. LiteRT-LM compatible.")
-    case _:
-        logger.error("OpenAI API audio input type: %s is unsupported.", OPENAI_API_AUDIO_INPUT_TYPE)
-        raise ValueError(
-            f"Unsupported OPENAI_API_AUDIO_INPUT_TYPE: {OPENAI_API_AUDIO_INPUT_TYPE!r} "
-            "(expected 'input_audio' or 'audio')"
-        )
-
 
 # ============================================================
 # OpenAI client
@@ -80,19 +62,12 @@ def transcribe_wav(
         wav_data
     ).decode("ascii")
 
-    if OPENAI_API_AUDIO_INPUT_TYPE == "input_audio":
-        audio_input_dict = {
-                "type": "input_audio",
-                "input_audio": {
-                    "data": audio_data,
-                    "format": "wav",
-                }
-        }
-    elif OPENAI_API_AUDIO_INPUT_TYPE == "audio":
-        audio_input_dict = {
-                "type": "audio",
-                "blob": audio_data,
-        }
+    # LiteRT-LM audio content part (as of v0.18.0).
+    # ref: https://github.com/google-ai-edge/LiteRT-LM/blob/main/docs/api/cpp/conversation.md
+    audio_input_dict = {
+            "type": "audio",
+            "blob": audio_data,
+    }
 
     try:
         response = client.chat.completions.create(

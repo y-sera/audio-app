@@ -33,8 +33,6 @@ spec:
               value: {{ include "audio-app.openaiBaseUrl" . | quote }}
             - name: OPENAI_MODEL
               value: {{ include "audio-app.openaiModel" . | quote }}
-            - name: OPENAI_API_AUDIO_INPUT_TYPE
-              value: {{ .Values.app.openai.audioInputType | quote }}
             {{- with .Values.app.transcriptionPrompt }}
             - name: OPENAI_PROMPT
               value: {{ . | quote }}

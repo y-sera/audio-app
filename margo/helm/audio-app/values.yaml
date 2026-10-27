@@ -25,15 +25,12 @@ app:
   # Japanese transcription prompt.
   transcriptionPrompt: ""
 
-  # OpenAI-compatible API settings. When llm.enabled is true, baseUrl is
+  # LiteRT-LM server API settings. When llm.enabled is true, baseUrl is
   # derived from the bundled LiteRT-LM service and model from llm.model.id.
   openai:
     apiKey: dummy
     baseUrl: ""
     model: ""
-    # input_audio: OpenAI API compatible (e.g. ollama)
-    # audio:       LiteRT-LM compatible
-    audioInputType: audio
 
   vad:
     threshold: 0.3
@@ -79,7 +76,7 @@ app:
 # LiteRT-LM: OpenAI-compatible LLM server (Gemma)
 # ------------------------------------------------------------
 llm:
-  # Set to false to use an external OpenAI-compatible endpoint
+  # Set to false to use an external LiteRT-LM server
   # (then set app.openai.baseUrl and app.openai.model).
   enabled: true
 
