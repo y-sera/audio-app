@@ -16,9 +16,9 @@ services:
       LLM_MODEL_ID: ${LLM_MODEL_ID:-gemma-4-E2B-it.litertlm}
       LLM_MODEL_HF_REPO: ${LLM_MODEL_HF_REPO:-litert-community/gemma-4-E2B-it-litert-lm}
       LLM_MODEL_HF_FILE: ${LLM_MODEL_HF_FILE:-gemma-4-E2B-it.litertlm}
-      LLM_BACKEND: ${LLM_BACKEND:-gpu}
-      LLM_AUDIO_BACKEND: ${LLM_AUDIO_BACKEND:-cpu}
     # Download the model on first start, write config.json, then serve.
+    # The Compose profile runs inference on the CPU only; GPU inference is
+    # available with the Helm profile (llm.model.backend=gpu).
     command:
       - sh
       - -ec
@@ -33,8 +33,8 @@ services:
           "default": {},
           "models": {
             "$$LLM_MODEL_ID": {
-              "backend": "$$LLM_BACKEND",
-              "audio_backend": "$$LLM_AUDIO_BACKEND"
+              "backend": "cpu",
+              "audio_backend": "cpu"
             }
           }
         }
@@ -58,12 +58,6 @@ services:
         limits:
           cpus: "4"
           memory: 6000M
-        # GPU backend (Vulkan) on NVIDIA. Requires the NVIDIA Container Toolkit.
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu, graphics, compute, utility]
 
   audio-app:
     image: ghcr.io/y-sera/audio-app/audio-app:0.1.0

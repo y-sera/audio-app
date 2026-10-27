@@ -25,10 +25,11 @@ into text, entirely on the device.
 
 - amd64 CPU with at least 2.5 cores, 4 GiB of memory and 10 GiB of storage
 - A USB microphone (ALSA, `/dev/snd`)
-- An NVIDIA GPU with Vulkan support
-  - Kubernetes: the `nvidia` RuntimeClass, and a device plugin that advertises
-    `/dev/snd` as an extended resource (default `devic.es/audio`)
-  - Compose: the NVIDIA Container Toolkit
+  - Kubernetes: a device plugin that advertises `/dev/snd` as an extended resource
+    (default `devic.es/audio`)
+- Inference runs on the CPU by default; no GPU is required.
+  - Kubernetes only: with the inference backend set to `gpu`, an NVIDIA GPU with
+    Vulkan support and the `nvidia` RuntimeClass
 - Internet access to Hugging Face on first start, to download the model (~2.5 GB)
 
 ## Configuration
@@ -41,5 +42,5 @@ into text, entirely on the device.
 | End Threshold | `0.2` | VAD speech probability below which a recording may end |
 | Minimum Speech (ms) | `150` | Speech needed before a recording starts |
 | Minimum Silence (ms) | `700` | Silence that ends a recording |
-| Inference Backend | `gpu` | LiteRT-LM backend (`gpu` or `cpu`) |
+| Inference Backend | `cpu` | LiteRT-LM backend (`cpu` or `gpu`, Helm only) |
 | Microphone Resource Name | `devic.es/audio` | Extended resource for `/dev/snd` (Helm only) |

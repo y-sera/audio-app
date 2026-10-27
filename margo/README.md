@@ -66,17 +66,32 @@ uvx -p 3.12 --from linkml linkml validate \
   `docker compose publish` is not used (incompatible with Margo).
 - **Parameters**: Helm targets use `--set` dot notation; Compose targets are environment
   variables consumed via `${VAR:-default}` interpolation in `compose.yaml`.
-- **Device constraints**: amd64, 2.5 cores, 4096Mi memory, 10Gi storage, plus eligibility
-  rules requiring a `microphone` peripheral and an NVIDIA `gpu` peripheral.
+- **Device constraints**: amd64, 2.5 cores, 4096Mi memory, 10Gi storage, plus an
+  eligibility rule requiring a `microphone` peripheral. No GPU is required.
 
 ## Device prerequisites
 
-- **Kubernetes**: the `nvidia` RuntimeClass, and a device plugin advertising `/dev/snd` as
-  `devic.es/audio` (e.g. `../deploy/generic-device-plugin.yaml`). The plugin is a
-  cluster-wide privileged DaemonSet, so it is not part of the application package.
-  Without a plugin, set `app.audioDevice.mode=hostPath` (mounts `/dev/snd`, runs privileged).
-- **Compose**: NVIDIA Container Toolkit; `/dev/snd` on the host.
+- **Kubernetes**: a device plugin advertising `/dev/snd` as `devic.es/audio`
+  (e.g. `../deploy/generic-device-plugin.yaml`). The plugin is a cluster-wide privileged
+  DaemonSet, so it is not part of the application package. Without a plugin, set
+  `app.audioDevice.mode=hostPath` (mounts `/dev/snd`, runs privileged).
+- **Compose**: `/dev/snd` on the host.
 - **Both**: access to Hugging Face on first start (model download into a persistent volume).
+
+## Inference backend
+
+LiteRT-LM runs on the CPU by default. The Helm chart switches to the GPU with
+`llm.model.backend=gpu` (Margo parameter `llmBackend`), which also applies the settings
+under `llm.gpu` to the LiteRT-LM pod:
+
+| Value | Default | Effect with `backend: gpu` |
+| --- | --- | --- |
+| `llm.gpu.runtimeClassName` | `nvidia` | Pod `runtimeClassName` (empty: cluster default) |
+| `llm.gpu.resources` | `{}` | Merged into the container's resource limits, e.g. `nvidia.com/gpu: 1` |
+| `llm.gpu.env` | `[]` | Extra container environment, e.g. `NVIDIA_DRIVER_CAPABILITIES` |
+
+With `backend: cpu` none of these are rendered. The Compose profile is CPU only, since
+Compose cannot add or drop the GPU device reservation based on a parameter.
 
 ## Changing the registry
 

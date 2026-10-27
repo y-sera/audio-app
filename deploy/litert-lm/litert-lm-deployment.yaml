@@ -18,7 +18,9 @@ spec:
       labels:
         app: gemma4-e2b-litert-lm
     spec:
-      runtimeClassName: nvidia
+      # For the GPU backend, set "backend": "gpu" in litert-lm-configmap.yaml and
+      # uncomment the RuntimeClass that exposes the GPU.
+      #runtimeClassName: nvidia
       #initContainers:
       #- image: ghcr.io/y-sera/audio-app/litert-lm:0.1.0
       #  name: download-model

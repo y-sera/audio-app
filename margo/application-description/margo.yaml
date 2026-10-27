@@ -26,10 +26,12 @@ deploymentProfiles:
     id: y-sera-audio-app-helm-a
     description: >-
       Deploys the audio-app and a LiteRT-LM server as a single Helm chart on Kubernetes.
-      The device needs a USB microphone and an NVIDIA GPU (Vulkan) usable through the
-      "nvidia" RuntimeClass. By default the microphone is requested as the extended
-      resource "devic.es/audio", which must be advertised by a device plugin
+      The device needs a USB microphone, requested by default as the extended resource
+      "devic.es/audio", which must be advertised by a device plugin
       (e.g. squat/generic-device-plugin) installed on the node.
+      Inference runs on the CPU by default. Setting the inference backend to "gpu"
+      runs it on a GPU through Vulkan using the "nvidia" RuntimeClass, so it then
+      also needs an NVIDIA GPU and that RuntimeClass on the device.
     components:
       - name: audio-app
         properties:
@@ -56,22 +58,11 @@ deploymentProfiles:
                     - key: /type
                       operator: In
                       values: ["microphone"]
-              - key: /peripherals
-                operator: ContainsAll
-                itemSelector:
-                  matchExpressions:
-                    - key: /type
-                      operator: In
-                      values: ["gpu"]
-                    - key: /manufacturer
-                      operator: In
-                      values: ["NVIDIA"]
   - type: compose
     id: y-sera-audio-app-compose-a
     description: >-
       Deploys the audio-app and a LiteRT-LM server with Compose. The device needs a
-      USB microphone exposed as /dev/snd and an NVIDIA GPU usable through the
-      NVIDIA Container Toolkit.
+      USB microphone exposed as /dev/snd. Inference runs on the CPU only.
     components:
       - name: audio-app-compose
         properties:
@@ -97,16 +88,6 @@ deploymentProfiles:
                     - key: /type
                       operator: In
                       values: ["microphone"]
-              - key: /peripherals
-                operator: ContainsAll
-                itemSelector:
-                  matchExpressions:
-                    - key: /type
-                      operator: In
-                      values: ["gpu"]
-                    - key: /manufacturer
-                      operator: In
-                      values: ["NVIDIA"]
 parameters:
   logLevel:
     value: INFO
@@ -151,12 +132,10 @@ parameters:
       - pointer: MIN_SILENCE_MS
         components: ["audio-app-compose"]
   llmBackend:
-    value: gpu
+    value: cpu
     targets:
       - pointer: llm.model.backend
         components: ["audio-app"]
-      - pointer: LLM_BACKEND
-        components: ["audio-app-compose"]
   audioDeviceResourceName:
     value: devic.es/audio
     targets:
@@ -196,7 +175,9 @@ configuration:
       settings:
         - parameter: llmBackend
           name: Inference Backend
-          description: Backend LiteRT-LM uses to run the model.
+          description: >-
+            Backend LiteRT-LM uses to run the model. "gpu" requires an NVIDIA GPU and the
+            "nvidia" RuntimeClass (Helm deployments only; Compose always uses the CPU).
           schema: llmBackendSelect
     - name: Kubernetes
       settings:
@@ -226,5 +207,5 @@ configuration:
       allowEmpty: false
     - name: llmBackendSelect
       dataType: string
-      options: ["gpu", "cpu"]
+      options: ["cpu", "gpu"]
       allowEmpty: false

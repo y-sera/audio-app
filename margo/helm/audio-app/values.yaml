@@ -85,9 +85,6 @@ llm:
     tag: ""
     pullPolicy: IfNotPresent
 
-  # e.g. "nvidia" for GPU nodes. Empty uses the cluster default runtime.
-  runtimeClassName: nvidia
-
   port: 8080
   verbose: true
 
@@ -101,9 +98,20 @@ llm:
       file: gemma-4-E2B-it.litertlm
       # Optional Secret (key: token) for gated HuggingFace repositories.
       tokenSecretName: ""
-    # cpu | gpu | npu
-    backend: gpu
+    # Inference backend: cpu | gpu. With gpu, the settings under llm.gpu
+    # are applied to the LiteRT-LM pod (GPU access via Vulkan).
+    backend: cpu
     audioBackend: cpu
+
+  # Applied only when llm.model.backend is gpu.
+  gpu:
+    # RuntimeClass that exposes the GPU to the container, e.g. "nvidia".
+    # Empty uses the cluster default runtime.
+    runtimeClassName: nvidia
+    # Extra resource limits, e.g. {nvidia.com/gpu: 1} or {amd.com/gpu: 1}.
+    resources: {}
+    # Extra environment variables, e.g. NVIDIA_DRIVER_CAPABILITIES.
+    env: []
 
   persistence:
     enabled: true

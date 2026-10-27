@@ -18,7 +18,6 @@ spec:
       labels:
         app: audio-app
     spec:
-      #runtimeClassName: nvidia
       containers:
       - image: ghcr.io/y-sera/audio-app/audio-app:0.1.0
         name: main

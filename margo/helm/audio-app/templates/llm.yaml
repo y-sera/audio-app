@@ -1,4 +1,12 @@
 {{- if .Values.llm.enabled }}
+{{- if not (has .Values.llm.model.backend (list "cpu" "gpu")) }}
+{{- fail "llm.model.backend must be cpu or gpu" }}
+{{- end }}
+{{- $gpu := eq .Values.llm.model.backend "gpu" }}
+{{- $resources := deepCopy .Values.llm.resources }}
+{{- if and $gpu .Values.llm.gpu.resources }}
+{{- $_ := set $resources "limits" (merge (deepCopy .Values.llm.gpu.resources) (default (dict) $resources.limits)) }}
+{{- end }}
 {{- $modelDir := printf "/root/.litert-lm/models/%s" (.Values.llm.model.id | replace "/" "--") }}
 {{- $modelConfig := dict "backend" .Values.llm.model.backend "audio_backend" .Values.llm.model.audioBackend }}
 {{- $config := dict "default" (dict) "models" (dict .Values.llm.model.id $modelConfig) | toPrettyJson }}
@@ -56,8 +64,8 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.llm.runtimeClassName }}
-      runtimeClassName: {{ . }}
+      {{- if and $gpu .Values.llm.gpu.runtimeClassName }}
+      runtimeClassName: {{ .Values.llm.gpu.runtimeClassName }}
       {{- end }}
       {{- if .Values.llm.model.download.enabled }}
       initContainers:
@@ -116,8 +124,12 @@ spec:
               path: /v1/models
               port: http
             periodSeconds: 10
+          {{- if and $gpu .Values.llm.gpu.env }}
+          env:
+            {{- toYaml .Values.llm.gpu.env | nindent 12 }}
+          {{- end }}
           resources:
-            {{- toYaml .Values.llm.resources | nindent 12 }}
+            {{- toYaml $resources | nindent 12 }}
           volumeMounts:
             - name: models
               mountPath: /root/.litert-lm/models

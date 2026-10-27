@@ -8,8 +8,8 @@ data:
     {
       "default": {},
       "models": {
-        "gemma4-E2B-it.litertlm": {
-          "backend": "gpu",
+        "gemma-4-E2B-it.litertlm": {
+          "backend": "cpu",
           "audio_backend": "cpu"
         }
       }
