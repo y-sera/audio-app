@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.1.1
+
+- Default transcription prompt is now English (instruction and output).
+- Inference runs on the CPU by default; GPU is optional (Helm `llm.model.backend=gpu`).
+- Multi-arch images for amd64 and arm64.
+- Dependency updates: openai 3.37.0, onnxruntime 1.31.0, numpy 2.5.4, uv_build 0.13.
+- Pinned LiteRT-LM 0.18.1 and uv 0.13.6 in the images.
+
 ## 0.1.0
 
 - Initial Margo application package.

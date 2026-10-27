@@ -23,11 +23,11 @@ margo/
 
 | Artifact | Reference | Media / artifact type |
 | --- | --- | --- |
-| audio-app image | `ghcr.io/y-sera/audio-app/audio-app:0.1.0` | container image |
-| litert-lm image | `ghcr.io/y-sera/audio-app/litert-lm:0.1.0` | container image |
-| Helm chart | `oci://ghcr.io/y-sera/audio-app/charts/audio-app:0.1.0` | Helm OCI chart |
-| Compose archive | `oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose:0.1.0` | `application/vnd.org.margo.component.compose+json` |
-| Application package | `ghcr.io/y-sera/audio-app/margo-package:0.1.0` | `application/vnd.margo.app.v1+json` |
+| audio-app image | `ghcr.io/y-sera/audio-app/audio-app:0.1.1` | container image |
+| litert-lm image | `ghcr.io/y-sera/audio-app/litert-lm:0.1.1` | container image |
+| Helm chart | `oci://ghcr.io/y-sera/audio-app/charts/audio-app:0.1.1` | Helm OCI chart |
+| Compose archive | `oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose:0.1.1` | `application/vnd.org.margo.component.compose+json` |
+| Application package | `ghcr.io/y-sera/audio-app/margo-package:0.1.1` | `application/vnd.margo.app.v1+json` |
 
 The Application Package tag is `metadata.version` of `margo.yaml`, and every component
 `revision` equals its chart version / OCI tag, as the spec requires.

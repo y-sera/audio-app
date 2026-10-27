@@ -10,7 +10,7 @@ name: audio-app
 
 services:
   litert-lm:
-    image: ghcr.io/y-sera/audio-app/litert-lm:0.1.0
+    image: ghcr.io/y-sera/audio-app/litert-lm:0.1.1
     restart: unless-stopped
     environment:
       LLM_MODEL_ID: ${LLM_MODEL_ID:-gemma-4-E2B-it.litertlm}
@@ -60,7 +60,7 @@ services:
           memory: 6000M
 
   audio-app:
-    image: ghcr.io/y-sera/audio-app/audio-app:0.1.0
+    image: ghcr.io/y-sera/audio-app/audio-app:0.1.1
     restart: unless-stopped
     depends_on:
       litert-lm:
