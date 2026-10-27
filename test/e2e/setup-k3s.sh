@@ -36,8 +36,10 @@ if [ -n "${GITHUB_ENV:-}" ]; then
   echo "KUBECONFIG=${KUBECONFIG}" >> "${GITHUB_ENV}"
 fi
 
-for _ in $(seq 1 60); do
-  if [ -f "${KUBECONFIG}" ] && kubectl get nodes >/dev/null 2>&1; then
+# The API server answers before the node has registered, so wait until a
+# node object exists before waiting for it to become Ready.
+for _ in $(seq 1 90); do
+  if [ -f "${KUBECONFIG}" ] && [ -n "$(kubectl get nodes -o name 2>/dev/null)" ]; then
     break
   fi
   sleep 2
