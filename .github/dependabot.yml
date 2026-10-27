@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Keeps the SHA-pinned actions in the workflows up to date.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories:
+      - /app/audio-app
+      - /app/litert-lm
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: uv
+    directory: /app/audio-app
+    schedule:
+      interval: weekly
