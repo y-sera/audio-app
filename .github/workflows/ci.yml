@@ -114,6 +114,16 @@ jobs:
           cache-from: type=gha,scope=audio-app-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=audio-app-${{ matrix.arch }}
 
+      - name: Smoke test audio-app image
+        env:
+          IMAGE: ${{ env.REGISTRY }}/audio-app:${{ steps.version.outputs.version }}
+        run: |
+          docker load -i "${RUNNER_TEMP}/images/audio-app.tar"
+          docker run --rm --network none \
+            -v "${GITHUB_WORKSPACE}/test:/test:ro" \
+            --entrypoint /app/.venv/bin/python \
+            "${IMAGE}" /test/smoke/audio_app_smoke.py /test/e2e/fixtures/sample.wav
+
       - name: Build litert-lm
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

@@ -55,7 +55,7 @@ Both workflows run only on manual dispatch (Actions tab → *Run workflow*).
 
 | Workflow | What it does |
 | --- | --- |
-| `ci.yml` | Static checks (versions, Helm render rules, Compose, `margo.yaml` schema) → builds both images natively on amd64 and arm64 runners → E2E on k3s per architecture |
+| `ci.yml` | Static checks (versions, Helm render rules, Compose, `margo.yaml` schema) → builds both images natively on amd64 and arm64 runners and smoke-tests the audio-app image (`test/smoke/`: PortAudio, Silero VAD on onnxruntime, WAV helpers, OpenAI client) → E2E on k3s per architecture |
 | `release.yml` | From `main` only: runs `ci.yml`, then pushes the **tested** images as a multi-arch manifest, plus the chart, Compose archive and application package (`release` environment) |
 
 The E2E test (`test/e2e/`) deploys only the LiteRT-LM server (`app.enabled=false`, CPU
