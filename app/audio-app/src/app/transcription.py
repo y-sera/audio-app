@@ -37,7 +37,11 @@ match OPENAI_API_AUDIO_INPUT_TYPE:
     case "audio":
         logger.info("OpenAI API audio input type: audio. LiteRT-LM compatible.")
     case _:
-        logger.error("OpenAI API audio input type: %s is unsupported.", OPEN_API_AUDIO_INPUT_TYPE)
+        logger.error("OpenAI API audio input type: %s is unsupported.", OPENAI_API_AUDIO_INPUT_TYPE)
+        raise ValueError(
+            f"Unsupported OPENAI_API_AUDIO_INPUT_TYPE: {OPENAI_API_AUDIO_INPUT_TYPE!r} "
+            "(expected 'input_audio' or 'audio')"
+        )
 
 
 # ============================================================
