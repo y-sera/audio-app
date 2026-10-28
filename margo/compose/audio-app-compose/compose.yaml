@@ -10,7 +10,7 @@ name: audio-app
 
 services:
   litert-lm:
-    image: ghcr.io/y-sera/audio-app/litert-lm:0.1.1
+    image: ghcr.io/y-sera/audio-app/litert-lm:0.1.2
     restart: unless-stopped
     environment:
       LLM_MODEL_ID: ${LLM_MODEL_ID:-gemma-4-E2B-it.litertlm}
@@ -52,7 +52,7 @@ services:
       timeout: 10s
       retries: 3
       # Allows for the first-start model download.
-      start_period: 10m
+      start_period: 30m
     deploy:
       resources:
         limits:
@@ -60,7 +60,7 @@ services:
           memory: 6000M
 
   audio-app:
-    image: ghcr.io/y-sera/audio-app/audio-app:0.1.1
+    image: ghcr.io/y-sera/audio-app/audio-app:0.1.2
     restart: unless-stopped
     depends_on:
       litert-lm:

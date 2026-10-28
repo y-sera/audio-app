@@ -2,9 +2,9 @@
 # the Helm chart, the Compose archive and the Margo application package to
 # GHCR.
 #
-# Security: manual dispatch from main only. Only the publish job gets
-# packages:write, and it runs in the "release" environment, which is
-# restricted to the main branch.
+# Security: manual dispatch from main or a release/* maintenance branch only.
+# Only the publish job gets packages:write, and it runs in the "release"
+# environment, which is restricted to those branches.
 name: Release
 
 on:
@@ -30,7 +30,7 @@ env:
 jobs:
   check:
     name: Check release inputs
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

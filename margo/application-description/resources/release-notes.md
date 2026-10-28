@@ -1,5 +1,10 @@
 # Release Notes
 
+## 0.1.2
+
+- Compose: the LiteRT-LM health check start period is raised from 10 minutes to
+  30 minutes, so a slow first-start model download no longer marks the service unhealthy.
+
 ## 0.1.1
 
 - Default transcription prompt is now English (instruction and output).

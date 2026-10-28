@@ -23,11 +23,11 @@ margo/
 
 | Artifact | Reference | Media / artifact type |
 | --- | --- | --- |
-| audio-app image | `ghcr.io/y-sera/audio-app/audio-app:0.1.1` | container image |
-| litert-lm image | `ghcr.io/y-sera/audio-app/litert-lm:0.1.1` | container image |
-| Helm chart | `oci://ghcr.io/y-sera/audio-app/charts/audio-app:0.1.1` | Helm OCI chart |
-| Compose archive | `oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose:0.1.1` | `application/vnd.org.margo.component.compose+json` |
-| Application package | `ghcr.io/y-sera/audio-app/margo-package:0.1.1` | `application/vnd.margo.app.v1+json` |
+| audio-app image | `ghcr.io/y-sera/audio-app/audio-app:0.1.2` | container image |
+| litert-lm image | `ghcr.io/y-sera/audio-app/litert-lm:0.1.2` | container image |
+| Helm chart | `oci://ghcr.io/y-sera/audio-app/charts/audio-app:0.1.2` | Helm OCI chart |
+| Compose archive | `oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose:0.1.2` | `application/vnd.org.margo.component.compose+json` |
+| Application package | `ghcr.io/y-sera/audio-app/margo-package:0.1.2` | `application/vnd.margo.app.v1+json` |
 
 The Application Package tag is `metadata.version` of `margo.yaml`, and every component
 `revision` equals its chart version / OCI tag, as the spec requires.
@@ -56,7 +56,7 @@ Both workflows run only on manual dispatch (Actions tab → *Run workflow*).
 | Workflow | What it does |
 | --- | --- |
 | `ci.yml` | Static checks (versions, Helm render rules, Compose, `margo.yaml` schema) → builds both images natively on amd64 and arm64 runners and smoke-tests the audio-app image (`test/smoke/`: PortAudio, Silero VAD on onnxruntime, WAV helpers, OpenAI client) → E2E on k3s per architecture |
-| `release.yml` | From `main` only: runs `ci.yml`, then pushes the **tested** images as a multi-arch manifest, plus the chart, Compose archive and application package (`release` environment) |
+| `release.yml` | From `main` or a `release/*` maintenance branch only: runs `ci.yml`, then pushes the **tested** images as a multi-arch manifest, plus the chart, Compose archive and application package (`release` environment) |
 
 The E2E test (`test/e2e/`) deploys only the LiteRT-LM server (`app.enabled=false`, CPU
 backend), sends `test/e2e/fixtures/sample.wav` to it and passes when the transcription
