@@ -22,7 +22,8 @@ into text, entirely on the device.
 | Component | Image | Role |
 | --- | --- | --- |
 | audio-app | `ghcr.io/y-sera/audio-app/audio-app` | Microphone capture, VAD, transcription client |
-| litert-lm | `ghcr.io/y-sera/audio-app/litert-lm` | OpenAI-compatible LLM server (Gemma 4 E2B) |
+| litert-lm-bundled | `ghcr.io/y-sera/audio-app/litert-lm-bundled` | OpenAI-compatible LLM server with Gemma 4 E2B built in (model source `bundled`, default) |
+| litert-lm | `ghcr.io/y-sera/audio-app/litert-lm` | The same server; downloads the model on first start (model source `download`) |
 | ui | `ghcr.io/y-sera/audio-app/ui` | Web UI showing the transcripts (optional) |
 
 ## Device requirements
@@ -34,7 +35,8 @@ into text, entirely on the device.
 - Inference runs on the CPU by default; no GPU is required.
   - Kubernetes only: with the inference backend set to `gpu`, an NVIDIA GPU with
     Vulkan support and the `nvidia` RuntimeClass
-- Internet access to Hugging Face on first start, to download the model (~2.5 GB)
+- With the model source `download` only: internet access to Hugging Face on first start,
+  to download the model (~2.5 GB). The default, `bundled`, ships the model in the image.
 
 ## Configuration
 
@@ -48,5 +50,6 @@ into text, entirely on the device.
 | End Threshold | `0.2` | VAD speech probability below which a recording may end |
 | Minimum Speech (ms) | `150` | Speech needed before a recording starts |
 | Minimum Silence (ms) | `700` | Silence that ends a recording |
+| Model Source | `bundled` | `bundled`: model built into the image; `download`: downloaded from Hugging Face on first start |
 | Inference Backend | `cpu` | LiteRT-LM backend (`cpu` or `gpu`, Helm only) |
 | Microphone Resource Name | `devic.es/audio` | Extended resource for `/dev/snd` (Helm only) |

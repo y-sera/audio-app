@@ -8,63 +8,94 @@
 
 name: audio-app
 
-services:
-  litert-lm:
-    image: ghcr.io/y-sera/audio-app/litert-lm:0.2.0
-    restart: unless-stopped
-    environment:
-      LLM_MODEL_ID: ${LLM_MODEL_ID:-gemma-4-E2B-it.litertlm}
-      LLM_MODEL_HF_REPO: ${LLM_MODEL_HF_REPO:-litert-community/gemma-4-E2B-it-litert-lm}
-      LLM_MODEL_HF_FILE: ${LLM_MODEL_HF_FILE:-gemma-4-E2B-it.litertlm}
-    # Download the model on first start, write config.json, then serve.
-    # The Compose profile runs inference on the CPU only; GPU inference is
-    # available with the Helm profile (llm.model.backend=gpu).
-    command:
-      - sh
-      - -ec
-      - |
-        model_dir="/root/.litert-lm/models/$$(echo "$$LLM_MODEL_ID" | sed 's#/#--#g')"
-        if [ ! -f "$$model_dir/model.litertlm" ]; then
-          litert-lm import --from-huggingface-repo="$$LLM_MODEL_HF_REPO" "$$LLM_MODEL_HF_FILE" "$$LLM_MODEL_ID"
+# Shared by the two LiteRT-LM services below.
+x-litert-lm: &litert-lm
+  restart: unless-stopped
+  environment:
+    LLM_MODEL_ID: ${LLM_MODEL_ID:-gemma-4-E2B-it.litertlm}
+    LLM_MODEL_HF_REPO: ${LLM_MODEL_HF_REPO:-litert-community/gemma-4-E2B-it-litert-lm}
+    LLM_MODEL_HF_FILE: ${LLM_MODEL_HF_FILE:-gemma-4-E2B-it.litertlm}
+  # Download the model unless present, write config.json, then serve.
+  # The bundled image keeps its model under LITERT_LM_DIR (/opt/litert-lm)
+  # and sets LITERT_LM_MODEL_ID.
+  # The Compose profile runs inference on the CPU only; GPU inference is
+  # available with the Helm profile (llm.model.backend=gpu).
+  command:
+    - sh
+    - -ec
+    - |
+      model_dir="$${LITERT_LM_DIR:-/root/.litert-lm}/models/$$(echo "$$LLM_MODEL_ID" | sed 's#/#--#g')"
+      if [ ! -f "$$model_dir/model.litertlm" ]; then
+        if [ -n "$${LITERT_LM_MODEL_ID:-}" ]; then
+          echo "error: model $$LLM_MODEL_ID is not bundled in this image ($$LITERT_LM_MODEL_ID is)" >&2
+          exit 1
         fi
-        mkdir -p /etc/litert-lm
-        cat > /etc/litert-lm/config.json <<EOF
-        {
-          "default": {},
-          "models": {
-            "$$LLM_MODEL_ID": {
-              "backend": "cpu",
-              "audio_backend": "cpu"
-            }
+        litert-lm import --from-huggingface-repo="$$LLM_MODEL_HF_REPO" "$$LLM_MODEL_HF_FILE" "$$LLM_MODEL_ID"
+      fi
+      mkdir -p /etc/litert-lm
+      cat > /etc/litert-lm/config.json <<EOF
+      {
+        "default": {},
+        "models": {
+          "$$LLM_MODEL_ID": {
+            "backend": "cpu",
+            "audio_backend": "cpu"
           }
         }
-        EOF
-        exec litert-lm serve --host=0.0.0.0 --port=8080 --config=/etc/litert-lm/config.json --verbose
+      }
+      EOF
+      exec litert-lm serve --host=0.0.0.0 --port=8080 --config=/etc/litert-lm/config.json --verbose
+  healthcheck:
+    test:
+      - CMD
+      - python3
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/models', timeout=5)
+    interval: 10s
+    timeout: 10s
+    retries: 3
+    start_period: 10m
+  networks:
+    default:
+      # The audio-app reaches either service as litert-lm.
+      aliases:
+        - litert-lm
+  deploy:
+    resources:
+      limits:
+        cpus: "4"
+        memory: 3000M
+
+services:
+  # COMPOSE_PROFILES (Margo parameter llmModelSource) runs exactly one of the
+  # two LiteRT-LM services; .env defaults it to bundled.
+  #   bundled:  the model is built into the image (LLM_MODEL_ID must be the
+  #             bundled model)
+  #   download: the model is downloaded on first start into the
+  #             litert-lm-models volume
+  litert-lm-bundled:
+    <<: *litert-lm
+    image: ghcr.io/y-sera/audio-app/litert-lm-bundled:0.2.1
+    profiles: [bundled]
+
+  litert-lm:
+    <<: *litert-lm
+    image: ghcr.io/y-sera/audio-app/litert-lm:0.2.1
+    profiles: [download]
     volumes:
       - litert-lm-models:/root/.litert-lm/models
-    healthcheck:
-      test:
-        - CMD
-        - python3
-        - -c
-        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/models', timeout=5)
-      interval: 10s
-      timeout: 10s
-      retries: 3
-      # Allows for the first-start model download.
-      start_period: 10m
-    deploy:
-      resources:
-        limits:
-          cpus: "4"
-          memory: 3000M
 
   audio-app:
-    image: ghcr.io/y-sera/audio-app/audio-app:0.2.0
+    image: ghcr.io/y-sera/audio-app/audio-app:0.2.1
     restart: unless-stopped
+    # Only the LiteRT-LM service of the active profile exists.
     depends_on:
+      litert-lm-bundled:
+        condition: service_healthy
+        required: false
       litert-lm:
         condition: service_healthy
+        required: false
     environment:
       OPENAI_API_KEY: dummy
       OPENAI_BASE_URL: http://litert-lm:8080/v1
@@ -99,7 +130,7 @@ services:
   # With UI_ENABLED=false the container idles without serving: Compose
   # cannot drop a service based on a variable.
   ui:
-    image: ghcr.io/y-sera/audio-app/ui:0.2.0
+    image: ghcr.io/y-sera/audio-app/ui:0.2.1
     restart: unless-stopped
     depends_on:
       - audio-app

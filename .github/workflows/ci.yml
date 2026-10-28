@@ -148,21 +148,49 @@ jobs:
           docker load -i "${RUNNER_TEMP}/images/ui.tar"
           test/smoke/ui_smoke.sh "${APP_IMAGE}" "${UI_IMAGE}"
 
-      - name: Build litert-lm
+      - name: Build litert-lm (model downloaded at runtime)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: app/litert-lm
+          target: download
           platforms: linux/${{ matrix.arch }}
           tags: ${{ env.REGISTRY }}/litert-lm:${{ steps.version.outputs.version }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=MIT
-            org.opencontainers.image.description=LiteRT-LM OpenAI-compatible server for audio-app
+            org.opencontainers.image.description=LiteRT-LM OpenAI-compatible server for audio-app (model downloaded at runtime)
           provenance: false
           outputs: type=docker,dest=${{ runner.temp }}/images/litert-lm.tar
           cache-from: type=gha,scope=litert-lm-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=litert-lm-${{ matrix.arch }}
+
+      # Not cached: the model layer (~2.5 GB) would crowd out the other
+      # caches. The base layers come from the litert-lm cache above.
+      - name: Build litert-lm (bundled model)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: app/litert-lm
+          target: bundled
+          platforms: linux/${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/litert-lm-bundled:${{ steps.version.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.description=LiteRT-LM OpenAI-compatible server for audio-app with Gemma 4 E2B built in
+          provenance: false
+          outputs: type=docker,dest=${{ runner.temp }}/images/litert-lm-bundled.tar
+          cache-from: type=gha,scope=litert-lm-${{ matrix.arch }}
+
+      - name: Smoke test litert-lm bundled image
+        env:
+          IMAGE: ${{ env.REGISTRY }}/litert-lm-bundled:${{ steps.version.outputs.version }}
+        run: |
+          docker load -i "${RUNNER_TEMP}/images/litert-lm-bundled.tar"
+          docker run --rm --network none "${IMAGE}" \
+            sh -ec 'litert-lm list | grep -F "${LITERT_LM_MODEL_ID}"'
+          docker image rm "${IMAGE}"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -173,7 +201,7 @@ jobs:
           if-no-files-found: error
 
   e2e:
-    name: E2E on k3s (${{ matrix.arch }})
+    name: E2E on k3s (${{ matrix.arch }}, ${{ matrix.source }})
     needs: [lint, build]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
@@ -182,6 +210,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        arch: [amd64, arm64]
+        source: [bundled, download]
         include:
           - arch: amd64
             runner: ubuntu-24.04
@@ -189,6 +219,7 @@ jobs:
             runner: ubuntu-24.04-arm
     env:
       NAMESPACE: audio-app-e2e
+      MODEL_SOURCE: ${{ matrix.source }}
       RELEASE: audio-app
       MODEL_ID: gemma-4-E2B-it.litertlm
       MODEL_HF_REPO: litert-community/gemma-4-E2B-it-litert-lm
@@ -212,38 +243,54 @@ jobs:
       - name: Start k3s
         run: test/e2e/setup-k3s.sh
 
-      - name: Import images
+      # Only the LiteRT-LM server is deployed.
+      - name: Import image
         run: |
-          for image in "${RUNNER_TEMP}"/images/*.tar; do
-            sudo k3s ctr images import "${image}"
-          done
-          sudo k3s ctr images ls -q | grep "${REGISTRY}/"
+          name=litert-lm
+          if [ "${MODEL_SOURCE}" = bundled ]; then
+            name=litert-lm-bundled
+          fi
+          sudo k3s ctr images import "${RUNNER_TEMP}/images/${name}.tar"
+          sudo k3s ctr images ls -q | grep "${REGISTRY}/${name}:"
 
       - name: Restore model cache
         id: model-cache
+        if: matrix.source == 'download'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .e2e/models
           key: litert-lm-model-${{ env.MODEL_HF_REPO }}-${{ env.MODEL_HF_FILE }}-${{ env.MODEL_ID }}
 
-      - name: Provision model cache volume
+      - name: Create namespace
         run: |
-          mkdir -p "${MODEL_CACHE_DIR}" "${E2E_OUT}"
+          mkdir -p "${E2E_OUT}"
           kubectl create namespace "${NAMESPACE}"
+
+      - name: Provision model cache volume
+        if: matrix.source == 'download'
+        run: |
+          mkdir -p "${MODEL_CACHE_DIR}"
           sed -e "s|\${MODEL_CACHE_DIR}|${MODEL_CACHE_DIR}|g" -e "s|\${NAMESPACE}|${NAMESPACE}|g" \
             test/e2e/model-cache.yaml | kubectl apply -f -
 
       - name: Install chart (LiteRT-LM only, CPU)
         run: |
+          args=()
+          if [ "${MODEL_SOURCE}" = download ]; then
+            args=(
+              --set llm.persistence.existingClaim=e2e-models
+              --set-string llm.model.download.huggingfaceRepo="${MODEL_HF_REPO}"
+              --set-string llm.model.download.file="${MODEL_HF_FILE}"
+            )
+          fi
           helm upgrade --install "${RELEASE}" margo/helm/audio-app \
             --namespace "${NAMESPACE}" \
             --set app.enabled=false \
             --set llm.model.backend=cpu \
+            --set llm.model.source="${MODEL_SOURCE}" \
             --set llm.image.pullPolicy=Never \
-            --set llm.persistence.existingClaim=e2e-models \
             --set-string llm.model.id="${MODEL_ID}" \
-            --set-string llm.model.download.huggingfaceRepo="${MODEL_HF_REPO}" \
-            --set-string llm.model.download.file="${MODEL_HF_FILE}" \
+            "${args[@]}" \
             --wait --timeout 30m
 
       - name: Transcription test
@@ -265,14 +312,14 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: e2e-${{ matrix.arch }}
+          name: e2e-${{ matrix.arch }}-${{ matrix.source }}
           path: .e2e/out
           retention-days: 7
           if-no-files-found: ignore
 
       - name: Check downloaded model
         id: model
-        if: always() && steps.model-cache.outputs.cache-hit != 'true'
+        if: always() && matrix.source == 'download' && steps.model-cache.outputs.cache-hit != 'true'
         run: |
           if sudo test -f "${MODEL_CACHE_DIR}/${MODEL_ID//\//--}/model.litertlm"; then
             # Written as root by the init container.

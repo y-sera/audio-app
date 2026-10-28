@@ -1,5 +1,15 @@
 # Release Notes
 
+## 0.2.1
+
+- New parameter `llmModelSource` choosing where the LLM model comes from:
+  - `bundled` (default): new image `litert-lm-bundled` with Gemma 4 E2B built in.
+    Nothing is downloaded on the device and no model cache volume is used.
+  - `download`: `litert-lm`, which downloads the model from Hugging Face on first
+    start into a persistent volume, as before.
+  - Helm: `llm.model.source`. Compose: `COMPOSE_PROFILES`; the LiteRT-LM service is
+    `litert-lm-bundled` or `litert-lm` accordingly.
+
 ## 0.2.0
 
 - New optional web UI (Vite + React on nginx) that lists the transcripts as they are

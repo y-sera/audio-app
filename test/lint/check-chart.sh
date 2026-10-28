@@ -32,6 +32,9 @@ render no-ui --set ui.enabled=false
 render ui-cluster-ip --set ui.service.type=ClusterIP
 render persistence --set app.recordings.persistence.enabled=true \
   --set llm.persistence.existingClaim=models
+render download --set llm.model.source=download
+render download-existing-claim --set llm.model.source=download \
+  --set llm.persistence.existingClaim=models
 
 # GPU settings must only be rendered for the gpu backend.
 if grep -n 'runtimeClassName' "${out}/default.yaml"; then
@@ -58,9 +61,29 @@ if grep -n 'nodePort' "${out}/ui-cluster-ip.yaml"; then
 fi
 echo "ok: UI toggling"
 
+# The bundled model (default) needs neither a download nor a model cache.
+grep -q 'image: "ghcr.io/y-sera/audio-app/litert-lm-bundled:' "${out}/default.yaml"
+if grep -nE 'download-model|ci-audio-app-llm-models|/root/\.litert-lm/models' "${out}/default.yaml"; then
+  echo "error: bundled render downloads the model or mounts a model cache" >&2
+  exit 1
+fi
+grep -q 'image: "ghcr.io/y-sera/audio-app/litert-lm:' "${out}/download.yaml"
+grep -q 'name: download-model' "${out}/download.yaml"
+grep -q 'claimName: ci-audio-app-llm-models' "${out}/download.yaml"
+grep -q 'claimName: models' "${out}/download-existing-claim.yaml"
+if grep -n 'kind: PersistentVolumeClaim' "${out}/download-existing-claim.yaml"; then
+  echo "error: a model cache PVC is created despite existingClaim" >&2
+  exit 1
+fi
+echo "ok: model source"
+
 # Invalid values must fail.
 if helm template ci "${chart}" --set llm.model.backend=npu > /dev/null 2>&1; then
   echo "error: backend npu was accepted" >&2
+  exit 1
+fi
+if helm template ci "${chart}" --set llm.model.source=s3 > /dev/null 2>&1; then
+  echo "error: model source s3 was accepted" >&2
   exit 1
 fi
 echo "ok: invalid values rejected"

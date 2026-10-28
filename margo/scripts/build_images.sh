@@ -22,8 +22,15 @@ docker buildx build --platform "${PLATFORMS}" "${output[@]}" \
   -t "${APP_IMAGE}:${VERSION}" \
   "${APP_SRC_DIR}/audio-app"
 
+# LiteRT-LM without the model (downloaded at runtime) and with it built in.
 docker buildx build --platform "${PLATFORMS}" "${output[@]}" \
+  --target download \
   -t "${LLM_IMAGE}:${VERSION}" \
+  "${APP_SRC_DIR}/litert-lm"
+
+docker buildx build --platform "${PLATFORMS}" "${output[@]}" \
+  --target bundled \
+  -t "${LLM_BUNDLED_IMAGE}:${VERSION}" \
   "${APP_SRC_DIR}/litert-lm"
 
 docker buildx build --platform "${PLATFORMS}" "${output[@]}" \

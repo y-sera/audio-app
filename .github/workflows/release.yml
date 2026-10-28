@@ -62,7 +62,7 @@ jobs:
     name: Publish to GHCR
     needs: [check, test]
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     environment: release
     permissions:
       contents: read
@@ -85,20 +85,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # One image at a time, removed after the push: the bundled LiteRT-LM
+      # images are ~2.5 GB each.
       - name: Push tested images
         run: |
-          for name in audio-app litert-lm ui; do
-            image="${REGISTRY}/${name}"
+          while read -r file ref; do
+            image="${REGISTRY}/${ref}"
             sources=()
             for arch in amd64 arm64; do
-              docker load -i "${RUNNER_TEMP}/images/images-${arch}/${name}.tar"
-              docker tag "${image}:${VERSION}" "${image}:${VERSION}-${arch}"
-              docker push "${image}:${VERSION}-${arch}"
-              sources+=("${image}:${VERSION}-${arch}")
+              tar="${RUNNER_TEMP}/images/images-${arch}/${file}.tar"
+              docker load -i "${tar}"
+              rm -f "${tar}"
+              docker tag "${image}" "${image}-${arch}"
+              docker push "${image}-${arch}"
+              docker image rm "${image}" "${image}-${arch}"
+              sources+=("${image}-${arch}")
             done
-            docker buildx imagetools create -t "${image}:${VERSION}" "${sources[@]}"
-            docker buildx imagetools inspect "${image}:${VERSION}"
-          done
+            docker buildx imagetools create -t "${image}" "${sources[@]}"
+            docker buildx imagetools inspect "${image}"
+          done <<EOF
+          audio-app audio-app:${VERSION}
+          ui ui:${VERSION}
+          litert-lm litert-lm:${VERSION}
+          litert-lm-bundled litert-lm-bundled:${VERSION}
+          EOF
 
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
@@ -134,6 +144,7 @@ jobs:
             echo "| --- | --- |"
             echo "| audio-app image | \`${REGISTRY}/audio-app:${VERSION}\` |"
             echo "| litert-lm image | \`${REGISTRY}/litert-lm:${VERSION}\` |"
+            echo "| litert-lm-bundled image | \`${REGISTRY}/litert-lm-bundled:${VERSION}\` |"
             echo "| ui image | \`${REGISTRY}/ui:${VERSION}\` |"
             echo "| Helm chart | \`oci://${REGISTRY}/charts/audio-app:${VERSION}\` |"
             echo "| Compose archive | \`oci://${REGISTRY}/compose/audio-app-compose:${VERSION}\` |"

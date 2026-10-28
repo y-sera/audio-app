@@ -16,7 +16,7 @@ spec:
     requests:
       storage: {{ .Values.app.recordings.persistence.size }}
 {{- end }}
-{{- if and .Values.llm.enabled .Values.llm.persistence.enabled (not .Values.llm.persistence.existingClaim) }}
+{{- if and .Values.llm.enabled (eq (toString .Values.llm.model.source) "download") .Values.llm.persistence.enabled (not .Values.llm.persistence.existingClaim) }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

@@ -23,12 +23,13 @@ margo/
 
 | Artifact | Reference | Media / artifact type |
 | --- | --- | --- |
-| audio-app image | `ghcr.io/y-sera/audio-app/audio-app:0.2.0` | container image |
-| litert-lm image | `ghcr.io/y-sera/audio-app/litert-lm:0.2.0` | container image |
-| ui image | `ghcr.io/y-sera/audio-app/ui:0.2.0` | container image |
-| Helm chart | `oci://ghcr.io/y-sera/audio-app/charts/audio-app:0.2.0` | Helm OCI chart |
-| Compose archive | `oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose:0.2.0` | `application/vnd.org.margo.component.compose+json` |
-| Application package | `ghcr.io/y-sera/audio-app/margo-package:0.2.0` | `application/vnd.margo.app.v1+json` |
+| audio-app image | `ghcr.io/y-sera/audio-app/audio-app:0.2.1` | container image |
+| litert-lm image, model built in | `ghcr.io/y-sera/audio-app/litert-lm-bundled:0.2.1` | container image |
+| litert-lm image, model downloaded | `ghcr.io/y-sera/audio-app/litert-lm:0.2.1` | container image |
+| ui image | `ghcr.io/y-sera/audio-app/ui:0.2.1` | container image |
+| Helm chart | `oci://ghcr.io/y-sera/audio-app/charts/audio-app:0.2.1` | Helm OCI chart |
+| Compose archive | `oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose:0.2.1` | `application/vnd.org.margo.component.compose+json` |
+| Application package | `ghcr.io/y-sera/audio-app/margo-package:0.2.1` | `application/vnd.margo.app.v1+json` |
 
 The Application Package tag is `metadata.version` of `margo.yaml`, and every component
 `revision` equals its chart version / OCI tag, as the spec requires.
@@ -56,14 +57,15 @@ Both workflows run only on manual dispatch (Actions tab → *Run workflow*).
 
 | Workflow | What it does |
 | --- | --- |
-| `ci.yml` | Static checks (versions, Helm render rules, Compose, `margo.yaml` schema) → builds both images natively on amd64 and arm64 runners and smoke-tests the audio-app image (`test/smoke/`: PortAudio, Silero VAD on onnxruntime, WAV helpers, OpenAI client) → E2E on k3s per architecture |
+| `ci.yml` | Static checks (versions, Helm render rules, Compose, `margo.yaml` schema) → builds the images natively on amd64 and arm64 runners, checks that `litert-lm-bundled` contains the model and smoke-tests the audio-app image (`test/smoke/`: PortAudio, Silero VAD on onnxruntime, WAV helpers, OpenAI client) → E2E on k3s per architecture |
 | `release.yml` | From `main` only: runs `ci.yml`, then pushes the **tested** images as a multi-arch manifest, plus the chart, Compose archive and application package (`release` environment) |
 
-The E2E test (`test/e2e/`) deploys only the LiteRT-LM server (`app.enabled=false`, CPU
-backend), sends `test/e2e/fixtures/sample.wav` to it and passes when the transcription
+The E2E test (`test/e2e/`) runs per architecture and [model source](#model-source). It
+deploys only the LiteRT-LM server (`app.enabled=false`, CPU backend), sends `test/e2e/fixtures/sample.wav` to it and passes when the transcription
 contains every keyword in `expected-keywords.txt`. Until those fixtures exist it only checks
-that the server starts and lists the model. The model is kept in the Actions cache and
-mounted through `llm.persistence.existingClaim`, so it is downloaded only on a cache miss.
+that the server starts and lists the model. For `download`, the model is kept in the Actions
+cache and mounted through `llm.persistence.existingClaim`, so it is downloaded only on a
+cache miss.
 
 Validate the application description against the spec schema:
 
@@ -92,7 +94,8 @@ uvx -p 3.12 --from linkml linkml validate \
   DaemonSet, so it is not part of the application package. Without a plugin, set
   `app.audioDevice.mode=hostPath` (mounts `/dev/snd`, runs privileged).
 - **Compose**: `/dev/snd` on the host.
-- **Both**: access to Hugging Face on first start (model download into a persistent volume).
+- **Both**, with the model source `download` only: access to Hugging Face on first start
+  (model download into a persistent volume).
 
 ## Web UI
 
@@ -111,6 +114,31 @@ listening. The UI requires `app.enabled`; with `app.enabled=false` it is not dep
 
 The API and page have no authentication: anyone who can reach the port can read the
 transcripts. Set `ui.service.type=ClusterIP` (Helm) to keep it inside the cluster.
+
+## Model source
+
+Both images are built from `app/litert-lm/Dockerfile`: the `bundled` target downloads the
+model once at build time (on the build platform; the file is the same for every
+architecture) and adds it under `/opt/litert-lm` (`LITERT_LM_DIR`), the `download` target
+contains the server only.
+
+| Parameter `llmModelSource` | Image | Model |
+| --- | --- | --- |
+| `bundled` (default) | `litert-lm-bundled:<version>` (~2.5 GB larger) | Built in. No download, no model cache volume. |
+| `download` | `litert-lm:<version>` | Downloaded from Hugging Face on first start into a persistent volume |
+
+Helm: `llm.model.source`, which picks `llm.image.bundledRepository` or `llm.image.repository`.
+With `bundled`, `llm.model.download` and `llm.persistence` are ignored and no PVC is
+created; `llm.model.id` must stay the bundled model.
+
+Compose: `COMPOSE_PROFILES`. Compose cannot pick an image from a variable's value, so
+`compose.yaml` has one service per image, `litert-lm-bundled` (profile `bundled`) and
+`litert-lm` (profile `download`, with the `litert-lm-models` volume); the audio-app reaches
+either as `litert-lm`. The archive's `.env` sets `COMPOSE_PROFILES=bundled`, which a
+`COMPOSE_PROFILES` environment variable overrides. With no profile, no LiteRT-LM server runs.
+
+To bundle another model, build with `--build-arg MODEL_ID=… --build-arg MODEL_HF_REPO=…
+--build-arg MODEL_HF_FILE=…` and set `llm.model.id` / `LLM_MODEL_ID` to the same ID.
 
 ## Inference backend
 
@@ -131,6 +159,6 @@ Compose cannot add or drop the GPU device reservation based on a parameter.
 
 Update `REGISTRY` in `scripts/env.sh` and the references in:
 
-- `helm/audio-app/values.yaml` — `app.image.repository`, `llm.image.repository`
+- `helm/audio-app/values.yaml` — `app.image.repository`, `llm.image.repository`, `llm.image.bundledRepository`
 - `compose/audio-app-compose/compose.yaml` — `services.*.image`
 - `application-description/margo.yaml` — `deploymentProfiles[].components[].properties.repository`

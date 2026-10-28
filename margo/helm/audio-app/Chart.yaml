@@ -5,8 +5,8 @@ description: >-
   each utterance with a LiteRT-LM (OpenAI-compatible) server running Gemma.
 type: application
 # Must match ComponentProperties.revision in the Margo application description.
-version: 0.2.0
-appVersion: "0.2.0"
+version: 0.2.1
+appVersion: "0.2.1"
 home: https://github.com/y-sera/audio-app
 # Helm maps sources[0] to the org.opencontainers.image.source annotation,
 # which links the pushed chart to this repository on GHCR.

@@ -7,7 +7,7 @@ metadata:
     and transcribes each one with a locally hosted Gemma model served by LiteRT-LM.
     An optional web UI shows the transcripts as they are recognized.
   # MUST equal the tag of the Application Package in the Application Registry.
-  version: 0.2.0
+  version: 0.2.1
   catalog:
     application:
       icon: ./resources/icon.png
@@ -38,9 +38,10 @@ deploymentProfiles:
       - name: audio-app
         properties:
           repository: oci://ghcr.io/y-sera/audio-app/charts/audio-app
-          revision: 0.2.0
+          revision: 0.2.1
           wait: true
-          # Includes the first-start download of the model (~2.5 GB).
+          # Includes pulling the image with the bundled model, or the
+          # first-start download of the model (~2.5 GB).
           timeout: 20m0s
     deviceConstraints:
       capacityRequirements:
@@ -70,7 +71,7 @@ deploymentProfiles:
       - name: audio-app-compose
         properties:
           repository: oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose
-          revision: 0.2.0
+          revision: 0.2.1
           wait: true
           timeout: 20m0s
     deviceConstraints:
@@ -134,6 +135,13 @@ parameters:
       - pointer: app.vad.minSilenceMs
         components: ["audio-app"]
       - pointer: MIN_SILENCE_MS
+        components: ["audio-app-compose"]
+  llmModelSource:
+    value: bundled
+    targets:
+      - pointer: llm.model.source
+        components: ["audio-app"]
+      - pointer: COMPOSE_PROFILES
         components: ["audio-app-compose"]
   llmBackend:
     value: cpu
@@ -206,6 +214,13 @@ configuration:
           schema: milliseconds
     - name: LLM
       settings:
+        - parameter: llmModelSource
+          name: Model Source
+          description: >-
+            "bundled" uses a LiteRT-LM image with the model built in, so nothing is
+            downloaded on the device. "download" uses a smaller image and downloads the
+            model (~2.5 GB) from Hugging Face on first start into a persistent volume.
+          schema: llmModelSourceSelect
         - parameter: llmBackend
           name: Inference Backend
           description: >-
@@ -246,6 +261,10 @@ configuration:
     - name: logLevelSelect
       dataType: string
       options: ["DEBUG", "INFO", "WARNING", "ERROR"]
+      allowEmpty: false
+    - name: llmModelSourceSelect
+      dataType: string
+      options: ["bundled", "download"]
       allowEmpty: false
     - name: llmBackendSelect
       dataType: string

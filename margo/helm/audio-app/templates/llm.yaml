@@ -2,11 +2,19 @@
 {{- if not (has .Values.llm.model.backend (list "cpu" "gpu")) }}
 {{- fail "llm.model.backend must be cpu or gpu" }}
 {{- end }}
+{{- $source := toString .Values.llm.model.source }}
+{{- if not (has $source (list "bundled" "download")) }}
+{{- fail "llm.model.source must be bundled or download" }}
+{{- end }}
+{{- $download := eq $source "download" }}
+{{- $repository := ternary .Values.llm.image.repository .Values.llm.image.bundledRepository $download }}
+{{- $image := printf "%s:%s" $repository (.Values.llm.image.tag | default .Chart.AppVersion) }}
 {{- $gpu := eq .Values.llm.model.backend "gpu" }}
 {{- $resources := deepCopy .Values.llm.resources }}
 {{- if and $gpu .Values.llm.gpu.resources }}
 {{- $_ := set $resources "limits" (merge (deepCopy .Values.llm.gpu.resources) (default (dict) $resources.limits)) }}
 {{- end }}
+{{- /* source: download only; the bundled image sets LITERT_LM_DIR. */}}
 {{- $modelDir := printf "/root/.litert-lm/models/%s" (.Values.llm.model.id | replace "/" "--") }}
 {{- $modelConfig := dict "backend" .Values.llm.model.backend "audio_backend" .Values.llm.model.audioBackend }}
 {{- $config := dict "default" (dict) "models" (dict .Values.llm.model.id $modelConfig) | toPrettyJson }}
@@ -47,7 +55,7 @@ metadata:
     app.kubernetes.io/component: llm
 spec:
   replicas: 1
-  # The model cache volume is ReadWriteOnce.
+  # The model cache volume (source: download) is ReadWriteOnce.
   strategy:
     type: Recreate
   selector:
@@ -67,10 +75,10 @@ spec:
       {{- if and $gpu .Values.llm.gpu.runtimeClassName }}
       runtimeClassName: {{ .Values.llm.gpu.runtimeClassName }}
       {{- end }}
-      {{- if .Values.llm.model.download.enabled }}
+      {{- if and $download .Values.llm.model.download.enabled }}
       initContainers:
         - name: download-model
-          image: "{{ .Values.llm.image.repository }}:{{ .Values.llm.image.tag | default .Chart.AppVersion }}"
+          image: {{ $image | quote }}
           imagePullPolicy: {{ .Values.llm.image.pullPolicy }}
           command:
             - sh
@@ -98,7 +106,7 @@ spec:
       {{- end }}
       containers:
         - name: main
-          image: "{{ .Values.llm.image.repository }}:{{ .Values.llm.image.tag | default .Chart.AppVersion }}"
+          image: {{ $image | quote }}
           imagePullPolicy: {{ .Values.llm.image.pullPolicy }}
           args:
             - litert-lm
@@ -131,12 +139,15 @@ spec:
           resources:
             {{- toYaml $resources | nindent 12 }}
           volumeMounts:
+            {{- if $download }}
             - name: models
               mountPath: /root/.litert-lm/models
+            {{- end }}
             - name: config
               mountPath: /etc/litert-lm
               readOnly: true
       volumes:
+        {{- if $download }}
         - name: models
           {{- if .Values.llm.persistence.enabled }}
           persistentVolumeClaim:
@@ -144,6 +155,7 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- end }}
         - name: config
           configMap:
             name: {{ include "audio-app.llmFullname" . }}-config

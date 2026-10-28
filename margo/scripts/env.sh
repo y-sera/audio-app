@@ -1,7 +1,7 @@
 # Shared settings for the packaging scripts. Source, don't execute.
 #
 # The registry is provisional. When it changes, also update the references in:
-#   helm/audio-app/values.yaml                          (app/llm/ui image.repository)
+#   helm/audio-app/values.yaml                          (app/llm/ui image.repository, llm.image.bundledRepository)
 #   compose/audio-app-compose/compose.yaml              (services.*.image)
 #   application-description/margo.yaml                  (components[].properties.repository)
 
@@ -10,11 +10,12 @@ APP_SRC_DIR="$(cd "${MARGO_DIR}/../app" && pwd)"
 DIST_DIR="${MARGO_DIR}/dist"
 
 REGISTRY="${REGISTRY:-ghcr.io/y-sera/audio-app}"
-VERSION="${VERSION:-0.2.0}"
+VERSION="${VERSION:-0.2.1}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 
 APP_IMAGE="${REGISTRY}/audio-app"
 LLM_IMAGE="${REGISTRY}/litert-lm"
+LLM_BUNDLED_IMAGE="${REGISTRY}/litert-lm-bundled"
 UI_IMAGE="${REGISTRY}/ui"
 CHART_REPO="${REGISTRY}/charts"            # chart lands at ${CHART_REPO}/audio-app
 COMPOSE_REPO="${REGISTRY}/compose/audio-app-compose"
@@ -43,6 +44,9 @@ check_versions() {
     "${MARGO_DIR}/application-description/margo.yaml" | while read -r rev; do
     [ "${rev}" = "${VERSION}" ] || { echo "error: component revision ${rev} != VERSION ${VERSION}" >&2; exit 1; }
   done
-  grep -q ":${VERSION}\$" <(yq '.services[].image' "${MARGO_DIR}/compose/audio-app-compose/compose.yaml") \
-    || { echo "error: compose images are not tagged ${VERSION}" >&2; exit 1; }
+  if yq '.services[].image' "${MARGO_DIR}/compose/audio-app-compose/compose.yaml" \
+    | grep -v ":${VERSION}\$"; then
+    echo "error: compose images are not tagged ${VERSION}" >&2
+    exit 1
+  fi
 }

@@ -124,7 +124,10 @@ llm:
   enabled: true
 
   image:
+    # Image for llm.model.source: download.
     repository: ghcr.io/y-sera/audio-app/litert-lm
+    # Image for llm.model.source: bundled (the model built in).
+    bundledRepository: ghcr.io/y-sera/audio-app/litert-lm-bundled
     tag: ""
     pullPolicy: IfNotPresent
 
@@ -132,9 +135,18 @@ llm:
   verbose: true
 
   model:
+    # Where the model comes from:
+    #   bundled:  built into the image (llm.image.bundledRepository). Nothing
+    #             is downloaded and no model cache volume is used. llm.model.id
+    #             must be the bundled model, and llm.model.download and
+    #             llm.persistence are ignored.
+    #   download: downloaded from Hugging Face into the model cache volume on
+    #             first start (llm.image.repository).
+    source: bundled
     # Model ID registered with `litert-lm import` and requested by the app.
     id: gemma-4-E2B-it.litertlm
-    # Downloaded by an init container when not yet present in the cache.
+    # source: download only. Downloaded by an init container when not yet
+    # present in the cache.
     download:
       enabled: true
       huggingfaceRepo: litert-community/gemma-4-E2B-it-litert-lm
@@ -156,6 +168,7 @@ llm:
     # Extra environment variables, e.g. NVIDIA_DRIVER_CAPABILITIES.
     env: []
 
+  # Model cache volume; source: download only.
   persistence:
     enabled: true
     # Use an existing PVC for the model cache instead of creating one.
