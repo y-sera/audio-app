@@ -8,7 +8,7 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.30.5-alpine
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine
 
 # host:port of the audio-app transcript API.
 ENV API_UPSTREAM=audio-app:8000
