@@ -10,7 +10,7 @@ APP_SRC_DIR="$(cd "${MARGO_DIR}/../app" && pwd)"
 DIST_DIR="${MARGO_DIR}/dist"
 
 REGISTRY="${REGISTRY:-ghcr.io/y-sera/audio-app}"
-VERSION="${VERSION:-0.1.2}"
+VERSION="${VERSION:-0.1.3}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 
 APP_IMAGE="${REGISTRY}/audio-app"

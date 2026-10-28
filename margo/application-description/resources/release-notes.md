@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.1.3
+
+- Compose: the LiteRT-LM health check start period and the deployment timeout of the
+  Compose profile (`margo.yaml`) are both 45 minutes, so the deployment is not
+  considered failed while the model is still downloading on first start.
+
 ## 0.1.2
 
 - Compose: the LiteRT-LM health check start period is raised from 10 minutes to

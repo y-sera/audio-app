@@ -6,7 +6,7 @@ metadata:
     Captures audio from a USB microphone, detects utterances with Silero VAD
     and transcribes each one with a locally hosted Gemma model served by LiteRT-LM.
   # MUST equal the tag of the Application Package in the Application Registry.
-  version: 0.1.2
+  version: 0.1.3
   catalog:
     application:
       icon: ./resources/icon.png
@@ -36,7 +36,7 @@ deploymentProfiles:
       - name: audio-app
         properties:
           repository: oci://ghcr.io/y-sera/audio-app/charts/audio-app
-          revision: 0.1.2
+          revision: 0.1.3
           wait: true
           # Includes the first-start download of the model (~2.5 GB).
           timeout: 20m0s
@@ -68,9 +68,9 @@ deploymentProfiles:
       - name: audio-app-compose
         properties:
           repository: oci://ghcr.io/y-sera/audio-app/compose/audio-app-compose
-          revision: 0.1.2
+          revision: 0.1.3
           wait: true
-          timeout: 20m0s
+          timeout: 45m0s
     deviceConstraints:
       capacityRequirements:
         cpu:
