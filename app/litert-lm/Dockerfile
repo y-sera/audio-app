@@ -8,7 +8,7 @@ ARG MODEL_HF_REPO=litert-community/gemma-4-E2B-it-litert-lm
 ARG MODEL_HF_FILE=gemma-4-E2B-it.litertlm
 
 # Install uv
-FROM python:3.14-slim AS download
+FROM python:3.15-slim AS download
 COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /uvx /bin/
 
 # Use the system Python across both stages
