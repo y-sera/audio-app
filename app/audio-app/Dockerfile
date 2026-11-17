@@ -1,5 +1,5 @@
 # Install uv
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /uvx /bin/
 RUN apt update && \
     apt install -y gcc portaudio19-dev curl
@@ -37,7 +37,7 @@ RUN mkdir -p /app/models && \
 #FROM builder as dev
 #RUN uv add openai
 
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # Copy the environment, but not the source code
 COPY --from=builder /app/.venv /app/.venv
